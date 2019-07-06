@@ -1,0 +1,8 @@
+[package]
+name = "x509"
+version = "0.1.0"
+authors = ["Daniel Basedow <db@connectedcars.dk>"]
+edition = "2018"
+
+[dependencies]
+hex = "0.3"
