@@ -10,7 +10,7 @@ enum Error {
     ParseError,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct ObjectIdentifier(Vec<u64>);
 
 impl ObjectIdentifier {
@@ -35,8 +35,9 @@ impl Display for ObjectIdentifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Value {
+    Integer(i64),
     ObjectIdentifier(ObjectIdentifier),
     Sequence(Vec<Value>),
     //TODO: use different type
@@ -87,6 +88,40 @@ fn test_parse_object_identifier() {
     }
 }
 
+fn parse_integer(data: &[u8]) -> Result<Value, Error> {
+    if data.len() > 8 {
+        return Err(Error::ParseError);
+    }
+
+    let mut res: i64 = 0;
+    let a = data[0] as i8;
+    res += a as i64;
+
+    for &octet in &data[1..] {
+        res = (res << 8);
+        res = res | octet as i64;
+    }
+    Ok(Value::Integer(res))
+}
+
+#[test]
+fn test_parse_integer() {
+    let d: Vec<u8> = vec![0x80];
+    let res = parse_integer(&d);
+    assert!(res.is_ok());
+    assert_eq!(res.ok().unwrap(), Value::Integer(-128));
+
+    let d: Vec<u8> = vec![0xFF, 0x7F];
+    let res = parse_integer(&d);
+    assert!(res.is_ok());
+    assert_eq!(res.ok().unwrap(), Value::Integer(-129));
+
+    let d: Vec<u8> = vec![0x00, 0x80];
+    let res = parse_integer(&d);
+    assert!(res.is_ok());
+    assert_eq!(res.ok().unwrap(), Value::Integer(128));
+}
+
 fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
     let mut data = &data[..];
     let mut elements: Vec<Value> = Vec::new();
@@ -120,6 +155,7 @@ fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
 fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let (tlv, consumed) = get_tlv(data)?;
     let (value, _) = match tlv.get_data_type() {
+        0x02 => (parse_integer(&tlv.value)?, tlv.length),
         0x06 => (parse_object_identifier(&tlv.value)?, tlv.length),
         0x10 => (parse_sequence(&tlv.value)?, tlv.length),
         0x17 => (parse_utc_time(&tlv.value)?, tlv.length),
