@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::{io, fmt};
 use std::intrinsics::write_bytes;
+use std::string::FromUtf8Error;
 
 fn main() {
     println!("Hello, world!");
@@ -8,6 +9,12 @@ fn main() {
 
 enum Error {
     ParseError,
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(_: FromUtf8Error) -> Error {
+        Error::ParseError
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -36,14 +43,22 @@ impl Display for ObjectIdentifier {
 }
 
 #[derive(Debug, PartialEq)]
-enum Value {
+enum Value<'a> {
+    Boolean(bool),
     Integer(i64),
+    BitString(&'a [u8]),
+    OctetString(&'a [u8]),
+    Null,
     ObjectIdentifier(ObjectIdentifier),
-    Sequence(Vec<Value>),
+    Sequence(Vec<Value<'a>>),
     //TODO: use different type
     UTCTime(String),
     //TODO: use different type
     GeneralizedTime(String),
+    PrintableString(String),
+    Utf8String(String),
+    Set(Vec<Value<'a>>),
+    ContextSpecific(u8, Box<Value<'a>>),
 }
 
 fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
@@ -122,6 +137,22 @@ fn test_parse_integer() {
     assert_eq!(res.ok().unwrap(), Value::Integer(128));
 }
 
+fn parse_utf8_string(data: &[u8]) -> Result<Value, Error> {
+    Ok(Value::Utf8String(String::from_utf8(data.to_vec())?))
+}
+
+fn parse_printable_string(data: &[u8]) -> Result<Value, Error> {
+    Ok(Value::PrintableString(String::from_utf8(data.to_vec())?))
+}
+
+fn parse_bit_string(data: &[u8]) -> Result<Value, Error> {
+    Ok(Value::BitString(&data[..]))
+}
+
+fn parse_octet_string(data: &[u8]) -> Result<Value, Error> {
+    Ok(Value::OctetString(&data[..]))
+}
+
 fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
     let mut data = &data[..];
     let mut elements: Vec<Value> = Vec::new();
@@ -134,6 +165,20 @@ fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
     }
 
     Ok(Value::Sequence(elements))
+}
+
+fn parse_set(data: &[u8]) -> Result<Value, Error> {
+    let mut data = &data[..];
+    let mut elements: Vec<Value> = Vec::new();
+
+    while data.len() > 0 {
+        //let (tlv, consumed) = get_tlv(data)?;
+        let (value, consumed) = parse_der(&data)?;
+        elements.push(value);
+        data = &data[consumed..];
+    }
+
+    Ok(Value::Set(elements))
 }
 
 fn parse_utc_time(data: &[u8]) -> Result<Value, Error> {
@@ -152,19 +197,52 @@ fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
     }
 }
 
+fn parse_null(data: &[u8]) -> Result<Value, Error> {
+    Ok(Value::Null)
+}
+
+fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
+    if data.len() != 1 {
+        return Err(Error::ParseError);
+    }
+    Ok(Value::Boolean(data[0] == 0xff))
+}
+
 fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let (tlv, consumed) = get_tlv(data)?;
-    let (value, _) = match tlv.get_data_type() {
-        0x02 => (parse_integer(&tlv.value)?, tlv.length),
-        0x06 => (parse_object_identifier(&tlv.value)?, tlv.length),
-        0x10 => (parse_sequence(&tlv.value)?, tlv.length),
-        0x17 => (parse_utc_time(&tlv.value)?, tlv.length),
-        0x18 => (parse_generalized_time(&tlv.value)?, tlv.length),
+    if tlv.is_context_specific() && tlv.is_constructed_type() {
+        let (v, _) = parse_der(&tlv.value)?;
+        return Ok((Value::ContextSpecific(tlv.get_data_type(), Box::new(v)), consumed));
+    }
+
+    let value = match tlv.get_data_type() {
+        0x01 => parse_boolean(&tlv.value)?,
+        0x02 => parse_integer(&tlv.value)?,
+        0x03 => parse_bit_string(&tlv.value)?,
+        0x04 => parse_octet_string(&tlv.value)?,
+        0x05 => parse_null(&tlv.value)?,
+        0x06 => parse_object_identifier(&tlv.value)?,
+        0x0c => parse_utf8_string(&tlv.value)?,
+        0x10 => parse_sequence(&tlv.value)?,
+        0x11 => parse_set(&tlv.value)?,
+        0x13 => parse_printable_string(&tlv.value)?,
+        0x17 => parse_utc_time(&tlv.value)?,
+        0x18 => parse_generalized_time(&tlv.value)?,
         t => {
             unimplemented!("{} is not implemented", t);
         }
     };
     Ok((value, consumed))
+}
+
+#[test]
+fn test_parse_der() {
+    let d = hex::decode("308202bc308201a4a003020102020404c5fefc300d06092a864886f70d01010b0500302e312c302a0603550403132359756269636f2055324620526f6f742043412053657269616c203435373230303633313020170d3134303830313030303030305a180f32303530303930343030303030305a306d310b300906035504061302534531123010060355040a0c0959756269636f20414231223020060355040b0c1941757468656e74696361746f72204174746573746174696f6e3126302406035504030c1d59756269636f205532462045452053657269616c2038303038343733323059301306072a8648ce3d020106082a8648ce3d030107034200041cd8da7611a3f5ef1f885e950ba65d80e334855391584bd47f5b719c53235c2421e4e399bdb5736782419093576661493c914c2e6724df9394fcfa7dea8b1804a36c306a302206092b0601040182c40a020415312e332e362e312e342e312e34313438322e312e313013060b2b0601040182e51c0201010404030205203021060b2b0601040182e51c01010404120410f8a011f38c0a4d15800617111f9edc7d300c0603551d130101ff04023000300d06092a864886f70d01010b0500038201010077184cef752d1a05f30a5385dc2d86f8fac0637170b02262a5195cf5fed036fe00654e0d2915bc45529a3f895e6ac1ccd41e977156e00ba93a06e0ac99a6716584059c974a9450b58725d8b4cd534f88cfd59bc8734dd70409f726c5c23eb4f3106ea0d442d2b1bcc2061b302e2eb3245a76dddd60e55d422d1c7da92c541d9534a9f0fadb505162a866c3c7b6ecc5c7c3656b32d005ea755b64f414238d1441bbc7f97e65c7cd853d776b301b6aeac9d89d3f7dfe87d0f5c93fa87e39b9dee317f3d3ef2e8dfb560d44a1f686a255161ffad81a9bfb7338ac84537f15da5895d75cccc87296ad788ad007f20e06f9f24cb61d2ae7fc0804e4c5bfa1783f0977").unwrap();
+    let res = parse_der(&d);
+    assert!(res.is_ok());
+    let (value, consumed) = res.ok().unwrap();
+    assert_eq!(consumed, 704);
+    println!("{:#?}", value);
 }
 
 #[test]
@@ -199,6 +277,10 @@ impl<'a> TLV<'a> {
 
     fn is_constructed_type(&self) -> bool {
         self.tag & 0x20 == 0x20
+    }
+
+    fn is_context_specific(&self) -> bool {
+        self.tag & 0x80 == 0x80
     }
 }
 
