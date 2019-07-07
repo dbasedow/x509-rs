@@ -10,6 +10,7 @@ enum Error {
     ParseError,
 }
 
+#[derive(Debug)]
 struct ObjectIdentifier(Vec<u64>);
 
 impl ObjectIdentifier {
@@ -34,9 +35,14 @@ impl Display for ObjectIdentifier {
     }
 }
 
+#[derive(Debug)]
 enum Value {
     ObjectIdentifier(ObjectIdentifier),
     Sequence(Vec<Value>),
+    //TODO: use different type
+    UTCTime(String),
+    //TODO: use different type
+    GeneralizedTime(String),
 }
 
 fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
@@ -81,15 +87,55 @@ fn test_parse_object_identifier() {
     }
 }
 
+fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
+    let mut data = &data[..];
+    let mut elements: Vec<Value> = Vec::new();
+
+    while data.len() > 0 {
+        //let (tlv, consumed) = get_tlv(data)?;
+        let (value, consumed) = parse_der(&data)?;
+        elements.push(value);
+        data = &data[consumed..];
+    }
+
+    Ok(Value::Sequence(elements))
+}
+
+fn parse_utc_time(data: &[u8]) -> Result<Value, Error> {
+    if let Ok(s) = String::from_utf8(data.to_vec()) {
+        Ok(Value::UTCTime(s))
+    } else {
+        Err(Error::ParseError)
+    }
+}
+
+fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
+    if let Ok(s) = String::from_utf8(data.to_vec()) {
+        Ok(Value::GeneralizedTime(s))
+    } else {
+        Err(Error::ParseError)
+    }
+}
+
 fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let (tlv, consumed) = get_tlv(data)?;
-    let res = match tlv.get_data_type() {
+    let (value, _) = match tlv.get_data_type() {
         0x06 => (parse_object_identifier(&tlv.value)?, tlv.length),
+        0x10 => (parse_sequence(&tlv.value)?, tlv.length),
+        0x17 => (parse_utc_time(&tlv.value)?, tlv.length),
+        0x18 => (parse_generalized_time(&tlv.value)?, tlv.length),
         t => {
             unimplemented!("{} is not implemented", t);
         }
     };
-    Ok(res)
+    Ok((value, consumed))
+}
+
+#[test]
+fn test_parse_der_sequence() {
+    let d = hex::decode("3020170d3134303830313030303030305a180f32303530303930343030303030305a").unwrap();
+    let res = parse_der(&d);
+    assert!(res.is_ok());
 }
 
 #[test]
