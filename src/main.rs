@@ -36,9 +36,10 @@ impl Display for ObjectIdentifier {
 
 enum Value {
     ObjectIdentifier(ObjectIdentifier),
+    Sequence(Vec<Value>),
 }
 
-fn parse_object_identifier(data: &[u8]) -> Result<ObjectIdentifier, Error> {
+fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
     if data.len() < 1 {
         return Err(Error::ParseError);
     }
@@ -64,7 +65,7 @@ fn parse_object_identifier(data: &[u8]) -> Result<ObjectIdentifier, Error> {
         }
     }
 
-    Ok(res)
+    Ok(Value::ObjectIdentifier(res))
 }
 
 #[test]
@@ -73,5 +74,105 @@ fn test_parse_object_identifier() {
     let res = parse_object_identifier(&d);
     assert!(res.is_ok());
     let oid = res.ok().unwrap();
-    assert_eq!("1.2.840.113549", format!("{}", oid));
+    if let Value::ObjectIdentifier(oid) = oid {
+        assert_eq!("1.2.840.113549", format!("{}", oid));
+    } else {
+        panic!("wrong type");
+    }
+}
+
+fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
+    let (tlv, consumed) = get_tlv(data)?;
+    let res = match tlv.get_data_type() {
+        0x06 => (parse_object_identifier(&tlv.value)?, tlv.length),
+        t => {
+            unimplemented!("{} is not implemented", t);
+        }
+    };
+    Ok(res)
+}
+
+#[test]
+fn test_parse_der_object_id() {
+    let d = hex::decode("06062a864886f70d").unwrap();
+    let res = parse_der(&d);
+    assert!(res.is_ok());
+    if let (Value::ObjectIdentifier(value), consumed) = res.ok().unwrap() {
+        assert_eq!("1.2.840.113549", format!("{}", value));
+    } else {
+        panic!("wrong value type");
+    }
+}
+
+struct TLV<'a> {
+    tag: u8,
+    length: usize,
+    value: &'a [u8],
+}
+
+impl<'a> TLV<'a> {
+    fn get_data_type(&self) -> u8 {
+        self.tag & 0x1f
+    }
+
+    fn is_constructed_type(&self) -> bool {
+        self.tag & 0x20 == 0x20
+    }
+}
+
+fn get_tlv(data: &[u8]) -> Result<(TLV, usize), Error> {
+    if data.len() < 2 {
+        // we need at least a tag and a length (which may be 0)
+        return Err(Error::ParseError);
+    }
+
+    let mut consumed: usize = 0;
+
+    // we only handle single byte tags
+    let tag = data[0];
+    consumed += 1;
+
+    let first_length_octet = data[consumed];
+    consumed += 1;
+
+    let long_length_encoding = first_length_octet & 0x80 == 0x80;
+
+    let length;
+    if long_length_encoding {
+        let length_length = (first_length_octet & 0x7f) as usize;
+        if length_length > 8 {
+            return Err(Error::ParseError);
+        }
+        let mut tmp_length: usize = 0;
+        for &octet in &data[2..2 + length_length] {
+            consumed += 1;
+            tmp_length = tmp_length << 8;
+            tmp_length += octet as usize;
+        }
+        length = tmp_length;
+    } else {
+        length = (first_length_octet & 0x7f) as usize;
+    }
+
+    if length + consumed > data.len() {
+        return Err(Error::ParseError);
+    }
+
+    Ok((TLV {
+        tag,
+        length,
+        value: &data[consumed..consumed + length],
+    }, consumed + length))
+}
+
+#[test]
+fn test_get_tlv() {
+    let d = hex::decode("06062a864886f70d").unwrap();
+    let res = get_tlv(&d);
+    assert!(res.is_ok());
+    let (tlv, consumed) = res.ok().unwrap();
+    assert_eq!(consumed, 8);
+    assert_eq!(tlv.tag, 0x06);
+    assert_eq!(tlv.length, 6);
+    assert_eq!(hex::encode(tlv.value), "2a864886f70d");
 }
