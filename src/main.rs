@@ -51,17 +51,16 @@ fn parse_object_identifier(data: &[u8]) -> Result<ObjectIdentifier, Error> {
     res.push(x as u64);
     res.push(y as u64);
 
-    let mut sub_id_octets: Vec<u8> = Vec::new();
+    let mut sub_id: u64 = 0;
 
     for &octet in &data[1..] {
+        sub_id = sub_id << 7;
+        sub_id += (octet & 0x7f) as u64;
+
         if octet & 0x80 == 0 {
             //last part of subid.
-            sub_id_octets.push(octet);
-            let sub_id = sub_id_octs_to_u64(&sub_id_octets);
             res.push(sub_id);
-            sub_id_octets.truncate(0);
-        } else {
-            sub_id_octets.push(octet & 0x7f);
+            sub_id = 0;
         }
     }
 
@@ -75,23 +74,4 @@ fn test_parse_object_identifier() {
     assert!(res.is_ok());
     let oid = res.ok().unwrap();
     assert_eq!("1.2.840.113549", format!("{}", oid));
-}
-
-fn sub_id_octs_to_u64(octs: &[u8]) -> u64 {
-    let mut res = 0;
-
-    for (index, &octet) in octs.iter().rev().enumerate() {
-        res += octet as u64 * (0x01 << (7 * index as u64));
-    }
-
-    res
-}
-
-#[test]
-fn test_sub_id_octs_to_u64() {
-    let d: Vec<u8> = vec![6, 72];
-    assert_eq!(840, sub_id_octs_to_u64(&d));
-
-    let d: Vec<u8> = vec![6, 119, 13];
-    assert_eq!(113549, sub_id_octs_to_u64(&d));
 }
