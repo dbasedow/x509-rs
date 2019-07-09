@@ -1,14 +1,30 @@
-use std::fmt::{Display, Formatter};
-use std::{io, fmt};
-use std::intrinsics::write_bytes;
+use std::fmt::{Display, Formatter, Debug};
+use std::{fmt, env};
 use std::string::FromUtf8Error;
+use std::fs::File;
+use std::io::Read;
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> Result<(), Box<std::error::Error>> {
+    if let Some(file_name) = env::args().last() {
+        let mut f = File::open(file_name)?;
+        let mut buf = Vec::with_capacity(8192);
+        f.read_to_end(&mut buf)?;
+        let (parsed, consumed) = parse_der(&buf)?;
+        println!("parsed {} bytes", consumed);
+        println!("{:#?}", parsed);
+    }
+    Ok(())
 }
 
+#[derive(Debug)]
 enum Error {
     ParseError,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "Parse error")
+    }
 }
 
 impl From<FromUtf8Error> for Error {
@@ -17,7 +33,9 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
-#[derive(Debug, PartialEq)]
+impl std::error::Error for Error {}
+
+#[derive(PartialEq)]
 struct ObjectIdentifier(Vec<u64>);
 
 impl ObjectIdentifier {
@@ -34,11 +52,17 @@ impl Display for ObjectIdentifier {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         for (index, &sub_id) in self.0.iter().enumerate() {
             if index > 0 {
-                write!(f, ".");
+                write!(f, ".")?;
             }
-            write!(f, "{}", sub_id);
+            write!(f, "{}", sub_id)?;
         }
         Ok(())
+    }
+}
+
+impl Debug for ObjectIdentifier {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -113,7 +137,7 @@ fn parse_integer(data: &[u8]) -> Result<Value, Error> {
     res += a as i64;
 
     for &octet in &data[1..] {
-        res = (res << 8);
+        res = res << 8;
         res = res | octet as i64;
     }
     Ok(Value::Integer(res))
@@ -135,22 +159,6 @@ fn test_parse_integer() {
     let res = parse_integer(&d);
     assert!(res.is_ok());
     assert_eq!(res.ok().unwrap(), Value::Integer(128));
-}
-
-fn parse_utf8_string(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::Utf8String(String::from_utf8(data.to_vec())?))
-}
-
-fn parse_printable_string(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::PrintableString(String::from_utf8(data.to_vec())?))
-}
-
-fn parse_bit_string(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::BitString(&data[..]))
-}
-
-fn parse_octet_string(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::OctetString(&data[..]))
 }
 
 fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
@@ -197,10 +205,6 @@ fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
     }
 }
 
-fn parse_null(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::Null)
-}
-
 fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
     if data.len() != 1 {
         return Err(Error::ParseError);
@@ -218,14 +222,14 @@ fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let value = match tlv.get_data_type() {
         0x01 => parse_boolean(&tlv.value)?,
         0x02 => parse_integer(&tlv.value)?,
-        0x03 => parse_bit_string(&tlv.value)?,
-        0x04 => parse_octet_string(&tlv.value)?,
-        0x05 => parse_null(&tlv.value)?,
+        0x03 => Value::BitString(&tlv.value),
+        0x04 => Value::OctetString(&tlv.value),
+        0x05 => Value::Null,
         0x06 => parse_object_identifier(&tlv.value)?,
-        0x0c => parse_utf8_string(&tlv.value)?,
+        0x0c => Value::Utf8String(String::from_utf8(data.to_vec())?),
         0x10 => parse_sequence(&tlv.value)?,
         0x11 => parse_set(&tlv.value)?,
-        0x13 => parse_printable_string(&tlv.value)?,
+        0x13 => Value::PrintableString(String::from_utf8(data.to_vec())?),
         0x17 => parse_utc_time(&tlv.value)?,
         0x18 => parse_generalized_time(&tlv.value)?,
         t => {
@@ -241,7 +245,7 @@ fn test_parse_der() {
     let res = parse_der(&d);
     assert!(res.is_ok());
     let (value, consumed) = res.ok().unwrap();
-    assert_eq!(consumed, 704);
+    //assert_eq!(consumed, 704);
     println!("{:#?}", value);
 }
 
@@ -257,7 +261,7 @@ fn test_parse_der_object_id() {
     let d = hex::decode("06062a864886f70d").unwrap();
     let res = parse_der(&d);
     assert!(res.is_ok());
-    if let (Value::ObjectIdentifier(value), consumed) = res.ok().unwrap() {
+    if let (Value::ObjectIdentifier(value), _) = res.ok().unwrap() {
         assert_eq!("1.2.840.113549", format!("{}", value));
     } else {
         panic!("wrong value type");
@@ -340,3 +344,5 @@ fn test_get_tlv() {
     assert_eq!(tlv.length, 6);
     assert_eq!(hex::encode(tlv.value), "2a864886f70d");
 }
+
+mod x509;
