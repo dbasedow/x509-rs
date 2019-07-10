@@ -226,10 +226,10 @@ fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x04 => Value::OctetString(&tlv.value),
         0x05 => Value::Null,
         0x06 => parse_object_identifier(&tlv.value)?,
-        0x0c => Value::Utf8String(String::from_utf8(data.to_vec())?),
+        0x0c => Value::Utf8String(String::from_utf8(tlv.value.to_vec())?),
         0x10 => parse_sequence(&tlv.value)?,
         0x11 => parse_set(&tlv.value)?,
-        0x13 => Value::PrintableString(String::from_utf8(data.to_vec())?),
+        0x13 => Value::PrintableString(String::from_utf8(tlv.value.to_vec())?),
         0x17 => parse_utc_time(&tlv.value)?,
         0x18 => parse_generalized_time(&tlv.value)?,
         t => {
