@@ -3,6 +3,8 @@ use std::{fmt, env};
 use std::string::FromUtf8Error;
 use std::fs::File;
 use std::io::Read;
+use chrono::prelude::*;
+use std::num::ParseIntError;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     if let Some(file_name) = env::args().last() {
@@ -33,24 +35,47 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
-impl std::error::Error for Error {}
-
-#[derive(PartialEq)]
-struct ObjectIdentifier(Vec<u64>);
-
-impl ObjectIdentifier {
-    fn new() -> ObjectIdentifier {
-        ObjectIdentifier(Vec::new())
-    }
-
-    fn push(&mut self, id: u64) {
-        self.0.push(id)
+impl From<ParseIntError> for Error {
+    fn from(_: ParseIntError) -> Self {
+        Error::ParseError
     }
 }
 
-impl Display for ObjectIdentifier {
+impl std::error::Error for Error {}
+
+#[derive(PartialEq)]
+struct ObjectIdentifier<'a>(&'a [u8]);
+
+impl<'a> ObjectIdentifier<'a> {
+    fn to_parts(&self) -> Vec<u64> {
+        let mut res = Vec::new();
+        let data = self.0;
+        let y = data[0] % 40;
+        let x = (data[0] - y) / 40;
+
+        res.push(x as u64);
+        res.push(y as u64);
+
+        let mut sub_id: u64 = 0;
+
+        for &octet in &data[1..] {
+            sub_id = sub_id << 7;
+            sub_id += (octet & 0x7f) as u64;
+
+            if octet & 0x80 == 0 {
+                //last part of subid.
+                res.push(sub_id);
+                sub_id = 0;
+            }
+        }
+
+        res
+    }
+}
+
+impl<'a> Display for ObjectIdentifier<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        for (index, &sub_id) in self.0.iter().enumerate() {
+        for (index, &sub_id) in self.to_parts().iter().enumerate() {
             if index > 0 {
                 write!(f, ".")?;
             }
@@ -60,29 +85,145 @@ impl Display for ObjectIdentifier {
     }
 }
 
-impl Debug for ObjectIdentifier {
+impl<'a> Debug for ObjectIdentifier<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self)
     }
 }
 
+#[derive(PartialEq)]
+struct Boolean(u8);
+
+impl Boolean {
+    fn to_bool(&self) -> bool {
+        self.0 == 0xff
+    }
+}
+
+impl Debug for Boolean {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        let b = self.to_bool();
+        write!(f, "{:#?}", b)
+    }
+}
+
+#[derive(PartialEq)]
+struct Integer<'a>(&'a [u8]);
+
+impl<'a> Integer<'a> {
+    fn to_i64(&self) -> i64 {
+        let data = self.0;
+
+        let mut res: i64 = 0;
+        let a = data[0] as i8;
+        res += a as i64;
+
+        for &octet in &data[1..] {
+            res = res << 8;
+            res = res | octet as i64;
+        }
+        res
+    }
+}
+
+impl<'a> Debug for Integer<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        let i = self.to_i64();
+        write!(f, "{:#?}", i)
+    }
+}
+
+#[derive(PartialEq)]
+struct PrintableString<'a>(&'a [u8]);
+
+impl<'a> Display for PrintableString<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        if let Ok(s) = String::from_utf8(self.0.to_vec()) {
+            write!(f, "{}", s)
+        } else {
+            Err(fmt::Error::default())
+        }
+    }
+}
+
+impl<'a> Debug for PrintableString<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
+struct Utf8String<'a>(&'a [u8]);
+
+impl<'a> Display for Utf8String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        if let Ok(s) = String::from_utf8(self.0.to_vec()) {
+            write!(f, "{}", s)
+        } else {
+            Err(fmt::Error::default())
+        }
+    }
+}
+
+impl<'a> Debug for Utf8String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
+struct UTCTime<'a>(&'a [u8]);
+
+impl<'a> UTCTime<'a> {
+    fn to_datetime(&self) -> Result<DateTime<Utc>, Error> {
+        //TODO implement
+        Err(Error::ParseError)
+    }
+}
+
+impl<'a> Display for UTCTime<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        if let Ok(s) = String::from_utf8(self.0.to_vec()) {
+            write!(f, "{}", s)
+        } else {
+            Err(fmt::Error::default())
+        }
+    }
+}
+
+impl<'a> Debug for UTCTime<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum Value<'a> {
-    Boolean(bool),
-    Integer(i64),
+    Boolean(Boolean),
+    Integer(Integer<'a>),
     BitString(&'a [u8]),
     OctetString(&'a [u8]),
     Null,
-    ObjectIdentifier(ObjectIdentifier),
+    ObjectIdentifier(ObjectIdentifier<'a>),
     Sequence(Vec<Value<'a>>),
     //TODO: use different type
     UTCTime(String),
     //TODO: use different type
     GeneralizedTime(String),
-    PrintableString(String),
-    Utf8String(String),
+    PrintableString(PrintableString<'a>),
+    Utf8String(Utf8String<'a>),
     Set(Vec<Value<'a>>),
     ContextSpecific(u8, Box<Value<'a>>),
+}
+
+impl<'a> Display for Value<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Value::Boolean(b) => write!(f, "{:?}", b),
+            Value::Integer(b) => write!(f, "{:?}", b),
+            _ => unimplemented!("display not implemented"),
+        }
+    }
 }
 
 fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
@@ -90,28 +231,8 @@ fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
         return Err(Error::ParseError);
     }
 
-    let mut res = ObjectIdentifier::new();
 
-    let y = data[0] % 40;
-    let x = (data[0] - y) / 40;
-
-    res.push(x as u64);
-    res.push(y as u64);
-
-    let mut sub_id: u64 = 0;
-
-    for &octet in &data[1..] {
-        sub_id = sub_id << 7;
-        sub_id += (octet & 0x7f) as u64;
-
-        if octet & 0x80 == 0 {
-            //last part of subid.
-            res.push(sub_id);
-            sub_id = 0;
-        }
-    }
-
-    Ok(Value::ObjectIdentifier(res))
+    Ok(Value::ObjectIdentifier(ObjectIdentifier(data)))
 }
 
 #[test]
@@ -132,15 +253,7 @@ fn parse_integer(data: &[u8]) -> Result<Value, Error> {
         return Err(Error::ParseError);
     }
 
-    let mut res: i64 = 0;
-    let a = data[0] as i8;
-    res += a as i64;
-
-    for &octet in &data[1..] {
-        res = res << 8;
-        res = res | octet as i64;
-    }
-    Ok(Value::Integer(res))
+    Ok(Value::Integer(Integer(data)))
 }
 
 #[test]
@@ -148,17 +261,17 @@ fn test_parse_integer() {
     let d: Vec<u8> = vec![0x80];
     let res = parse_integer(&d);
     assert!(res.is_ok());
-    assert_eq!(res.ok().unwrap(), Value::Integer(-128));
+    assert_eq!(format!("{}", Value::Integer(Integer(&d))), "-128");
 
     let d: Vec<u8> = vec![0xFF, 0x7F];
     let res = parse_integer(&d);
     assert!(res.is_ok());
-    assert_eq!(res.ok().unwrap(), Value::Integer(-129));
+    assert_eq!(format!("{}", Value::Integer(Integer(&d))), "-129");
 
     let d: Vec<u8> = vec![0x00, 0x80];
     let res = parse_integer(&d);
     assert!(res.is_ok());
-    assert_eq!(res.ok().unwrap(), Value::Integer(128));
+    assert_eq!(format!("{}", Value::Integer(Integer(&d))), "128");
 }
 
 fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
@@ -209,7 +322,7 @@ fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
     if data.len() != 1 {
         return Err(Error::ParseError);
     }
-    Ok(Value::Boolean(data[0] == 0xff))
+    Ok(Value::Boolean(Boolean(data[0])))
 }
 
 fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
@@ -226,10 +339,10 @@ fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x04 => Value::OctetString(&tlv.value),
         0x05 => Value::Null,
         0x06 => parse_object_identifier(&tlv.value)?,
-        0x0c => Value::Utf8String(String::from_utf8(tlv.value.to_vec())?),
+        0x0c => Value::Utf8String(Utf8String(tlv.value)),
         0x10 => parse_sequence(&tlv.value)?,
         0x11 => parse_set(&tlv.value)?,
-        0x13 => Value::PrintableString(String::from_utf8(tlv.value.to_vec())?),
+        0x13 => Value::PrintableString(PrintableString(tlv.value)),
         0x17 => parse_utc_time(&tlv.value)?,
         0x18 => parse_generalized_time(&tlv.value)?,
         t => {
