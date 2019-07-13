@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use chrono::prelude::*;
 use std::num::ParseIntError;
+use crate::x509::Certificate;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     if let Some(file_name) = env::args().last() {
@@ -14,13 +15,17 @@ fn main() -> Result<(), Box<std::error::Error>> {
         let (parsed, consumed) = parse_der(&buf)?;
         println!("parsed {} bytes", consumed);
         println!("{:#?}", parsed);
+
+        let cert = Certificate::from_value(parsed);
+        println!("serial: {}", cert.get_serial()?);
     }
     Ok(())
 }
 
 #[derive(Debug)]
-enum Error {
+pub enum Error {
     ParseError,
+    X509Error,
 }
 
 impl fmt::Display for Error {
@@ -44,7 +49,7 @@ impl From<ParseIntError> for Error {
 impl std::error::Error for Error {}
 
 #[derive(PartialEq)]
-struct ObjectIdentifier<'a>(&'a [u8]);
+pub struct ObjectIdentifier<'a>(&'a [u8]);
 
 impl<'a> ObjectIdentifier<'a> {
     fn to_parts(&self) -> Vec<u64> {
@@ -92,7 +97,7 @@ impl<'a> Debug for ObjectIdentifier<'a> {
 }
 
 #[derive(PartialEq)]
-struct Boolean(u8);
+pub struct Boolean(u8);
 
 impl Boolean {
     fn to_bool(&self) -> bool {
@@ -108,7 +113,7 @@ impl Debug for Boolean {
 }
 
 #[derive(PartialEq)]
-struct Integer<'a>(&'a [u8]);
+pub struct Integer<'a>(&'a [u8]);
 
 impl<'a> Integer<'a> {
     fn to_i64(&self) -> i64 {
@@ -134,7 +139,7 @@ impl<'a> Debug for Integer<'a> {
 }
 
 #[derive(PartialEq)]
-struct PrintableString<'a>(&'a [u8]);
+pub struct PrintableString<'a>(&'a [u8]);
 
 impl<'a> Display for PrintableString<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
@@ -153,7 +158,7 @@ impl<'a> Debug for PrintableString<'a> {
 }
 
 #[derive(PartialEq)]
-struct Utf8String<'a>(&'a [u8]);
+pub struct Utf8String<'a>(&'a [u8]);
 
 impl<'a> Display for Utf8String<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
@@ -172,7 +177,7 @@ impl<'a> Debug for Utf8String<'a> {
 }
 
 #[derive(PartialEq)]
-struct UTCTime<'a>(&'a [u8]);
+pub struct UTCTime<'a>(&'a [u8]);
 
 impl<'a> UTCTime<'a> {
     fn to_datetime(&self) -> Result<DateTime<FixedOffset>, Error> {
@@ -261,7 +266,7 @@ impl<'a> Debug for UTCTime<'a> {
 }
 
 #[derive(PartialEq)]
-struct GeneralizedTime<'a>(&'a [u8]);
+pub struct GeneralizedTime<'a>(&'a [u8]);
 
 impl<'a> GeneralizedTime<'a> {
     fn to_datetime(&self) -> Result<DateTime<FixedOffset>, Error> {
@@ -328,7 +333,7 @@ impl<'a> Debug for GeneralizedTime<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-enum Value<'a> {
+pub enum Value<'a> {
     Boolean(Boolean),
     Integer(Integer<'a>),
     BitString(&'a [u8]),

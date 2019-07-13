@@ -1,11 +1,21 @@
-struct Certificate {
-    tbs_certificate: TBSCertificate,
-    //signature_algorithm: AlgorithmIdentifier,
-    signature: Vec<u8>,
-}
+use crate::Value;
+use crate::Error;
 
-enum Algorithm {
-    Sha256WithRSAEncryption,
-}
+pub struct Certificate<'a>(Value<'a>);
 
-struct TBSCertificate {}
+impl<'a> Certificate<'a> {
+    pub fn from_value(value: Value<'a>) -> Certificate<'a> {
+        Certificate(value)
+    }
+
+    pub fn get_serial(&self) -> Result<i64, Error> {
+        if let Value::Sequence(certificate) = &self.0 {
+            if let Value::Sequence(tbs_cert) = &certificate[0] {
+                if let Value::Integer(serial) = &tbs_cert[1] {
+                    return Ok(serial.to_i64());
+                }
+            }
+        }
+        Err(Error::X509Error)
+    }
+}
