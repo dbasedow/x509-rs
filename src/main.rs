@@ -17,7 +17,9 @@ fn main() -> Result<(), Box<std::error::Error>> {
         println!("{:#?}", parsed);
 
         let cert = Certificate::from_value(parsed);
-        println!("serial: {}", cert.get_serial()?);
+        println!("serial: {}", cert.serial()?);
+        println!("valid from: {}", cert.valid_from()?);
+        println!("valid from: {}", cert.valid_to()?);
     }
     Ok(())
 }
@@ -336,6 +338,7 @@ impl<'a> Debug for GeneralizedTime<'a> {
 pub enum Value<'a> {
     Boolean(Boolean),
     Integer(Integer<'a>),
+    //FIXME: BitString starts with a Byte indicating unused bits https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-bit-string
     BitString(&'a [u8]),
     OctetString(&'a [u8]),
     Null,
