@@ -49,7 +49,7 @@ impl<'a> Certificate<'a> {
     }
 
     pub fn signature(&self) -> Result<&[u8], Error> {
-        if let Value::Sequence(certificate) = &self.0 {
+        if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::BitString(signature) = certificate[2] {
                 return Ok(signature);
             }
@@ -59,7 +59,7 @@ impl<'a> Certificate<'a> {
 
     pub fn valid_from(&self) -> Result<DateTime<FixedOffset>, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Sequence(validty) = &tbs_cert[4] {
+        if let Value::Sequence(validty, _) = &tbs_cert[4] {
             return match &validty[0] {
                 Value::UTCTime(dt) => dt.to_datetime(),
                 Value::GeneralizedTime(dt) => dt.to_datetime(),
@@ -71,7 +71,7 @@ impl<'a> Certificate<'a> {
 
     pub fn valid_to(&self) -> Result<DateTime<FixedOffset>, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Sequence(validty) = &tbs_cert[4] {
+        if let Value::Sequence(validty, _) = &tbs_cert[4] {
             return match &validty[1] {
                 Value::UTCTime(dt) => dt.to_datetime(),
                 Value::GeneralizedTime(dt) => dt.to_datetime(),
@@ -82,9 +82,18 @@ impl<'a> Certificate<'a> {
     }
 
     fn tbs_cert(&self) -> Result<&Vec<Value>, Error> {
-        if let Value::Sequence(certificate) = &self.0 {
-            if let Value::Sequence(tbs_cert) = &certificate[0] {
+        if let Value::Sequence(certificate, _) = &self.0 {
+            if let Value::Sequence(tbs_cert, _) = &certificate[0] {
                 return Ok(tbs_cert);
+            }
+        }
+        Err(Error::X509Error)
+    }
+
+    pub fn raw_tbs_cert(&self) -> Result<&[u8], Error> {
+        if let Value::Sequence(certificate, _) = &self.0 {
+            if let Value::Sequence(_, raw) = &certificate[0] {
+                return Ok(raw);
             }
         }
         Err(Error::X509Error)

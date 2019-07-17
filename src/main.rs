@@ -343,7 +343,7 @@ pub enum Value<'a> {
     OctetString(&'a [u8]),
     Null,
     ObjectIdentifier(ObjectIdentifier<'a>),
-    Sequence(Vec<Value<'a>>),
+    Sequence(Vec<Value<'a>>, &'a [u8]),
     UTCTime(UTCTime<'a>),
     GeneralizedTime(GeneralizedTime<'a>),
     PrintableString(PrintableString<'a>),
@@ -410,7 +410,7 @@ fn test_parse_integer() {
     assert_eq!(format!("{}", Value::Integer(Integer(&d))), "128");
 }
 
-fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
+fn parse_sequence(data: &[u8]) -> Result<Vec<Value>, Error> {
     let mut data = &data[..];
     let mut elements: Vec<Value> = Vec::new();
 
@@ -421,7 +421,7 @@ fn parse_sequence(data: &[u8]) -> Result<Value, Error> {
         data = &data[consumed..];
     }
 
-    Ok(Value::Sequence(elements))
+    Ok(elements)
 }
 
 fn parse_set(data: &[u8]) -> Result<Value, Error> {
@@ -468,7 +468,7 @@ fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x05 => Value::Null,
         0x06 => parse_object_identifier(&tlv.value)?,
         0x0c => Value::Utf8String(Utf8String(tlv.value)),
-        0x10 => parse_sequence(&tlv.value)?,
+        0x10 => Value::Sequence(parse_sequence(&tlv.value)?, data),
         0x11 => parse_set(&tlv.value)?,
         0x13 => Value::PrintableString(PrintableString(tlv.value)),
         0x17 => parse_utc_time(&tlv.value)?,
