@@ -7,3 +7,5 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 hex = "0.3"
+ring = "0.14.6"
+untrusted = "0.6"

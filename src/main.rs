@@ -6,20 +6,34 @@ use std::io::Read;
 use chrono::prelude::*;
 use std::num::ParseIntError;
 use crate::x509::Certificate;
+use untrusted::Input;
 
 fn main() -> Result<(), Box<std::error::Error>> {
     if let Some(file_name) = env::args().last() {
         let mut f = File::open(file_name)?;
         let mut buf = Vec::with_capacity(8192);
         f.read_to_end(&mut buf)?;
-        let (parsed, consumed) = parse_der(&buf)?;
-        println!("parsed {} bytes", consumed);
-        println!("{:#?}", parsed);
+        let (parsed, _) = parse_der(&buf)?;
 
         let cert = Certificate::from_value(parsed);
         println!("serial: {}", cert.serial()?);
         println!("valid from: {}", cert.valid_from()?);
         println!("valid from: {}", cert.valid_to()?);
+
+        let key = cert.public_key()?;
+        let signature = cert.signature()?;
+        let msg = cert.raw_tbs_cert()?;
+
+        let res = ring::signature::verify(&ring::signature::RSA_PKCS1_2048_8192_SHA256,
+                                          Input::from(key),
+                                          Input::from(msg),
+                                          Input::from(signature),
+        );
+        if res.is_ok() {
+            println!("signature validation successful");
+        } else {
+            println!("signature validation failed");
+        }
     }
     Ok(())
 }
@@ -335,11 +349,19 @@ impl<'a> Debug for GeneralizedTime<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct BitString<'a>(&'a [u8]);
+
+impl<'a> BitString<'a> {
+    fn data(&self) -> (u8, &'a [u8]) {
+        (self.0[0], &self.0[1..])
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Value<'a> {
     Boolean(Boolean),
     Integer(Integer<'a>),
-    //FIXME: BitString starts with a Byte indicating unused bits https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-bit-string
-    BitString(&'a [u8]),
+    BitString(BitString<'a>),
     OctetString(&'a [u8]),
     Null,
     ObjectIdentifier(ObjectIdentifier<'a>),
@@ -463,12 +485,12 @@ fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let value = match tlv.get_data_type() {
         0x01 => parse_boolean(&tlv.value)?,
         0x02 => parse_integer(&tlv.value)?,
-        0x03 => Value::BitString(&tlv.value),
+        0x03 => Value::BitString(BitString(&tlv.value)),
         0x04 => Value::OctetString(&tlv.value),
         0x05 => Value::Null,
         0x06 => parse_object_identifier(&tlv.value)?,
         0x0c => Value::Utf8String(Utf8String(tlv.value)),
-        0x10 => Value::Sequence(parse_sequence(&tlv.value)?, data),
+        0x10 => Value::Sequence(parse_sequence(&tlv.value)?, &data[..consumed]),
         0x11 => parse_set(&tlv.value)?,
         0x13 => Value::PrintableString(PrintableString(tlv.value)),
         0x17 => parse_utc_time(&tlv.value)?,
@@ -486,8 +508,7 @@ fn test_parse_der() {
     let res = parse_der(&d);
     assert!(res.is_ok());
     let (value, consumed) = res.ok().unwrap();
-    //assert_eq!(consumed, 704);
-    println!("{:#?}", value);
+    assert_eq!(consumed, 704);
 }
 
 #[test]

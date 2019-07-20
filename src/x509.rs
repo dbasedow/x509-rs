@@ -12,6 +12,10 @@ pub enum Version {
     V3,
 }
 
+pub enum SignatureAlgorithm {
+    PKCS1_SHA256_RSA,
+}
+
 impl TryFrom<i64> for Version {
     type Error = Error;
 
@@ -50,8 +54,9 @@ impl<'a> Certificate<'a> {
 
     pub fn signature(&self) -> Result<&[u8], Error> {
         if let Value::Sequence(certificate, _) = &self.0 {
-            if let Value::BitString(signature) = certificate[2] {
-                return Ok(signature);
+            if let Value::BitString(signature) = &certificate[2] {
+                let (_, data) = signature.data();
+                return Ok(data);
             }
         }
         Err(Error::X509Error)
@@ -94,6 +99,33 @@ impl<'a> Certificate<'a> {
         if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::Sequence(_, raw) = &certificate[0] {
                 return Ok(raw);
+            }
+        }
+        Err(Error::X509Error)
+    }
+
+    pub fn public_key(&self) -> Result<&[u8], Error> {
+        let tbs_cert = self.tbs_cert()?;
+        if let Value::Sequence(seq, _) = &tbs_cert[6] {
+            if let Value::BitString(key) = &seq[1] {
+                let (_, data) = key.data();
+                return Ok(data);
+            }
+        }
+
+        Err(Error::X509Error)
+    }
+
+    pub fn signature_algorithm(&self) -> Result<SignatureAlgorithm, Error> {
+        if let Value::Sequence(certificate, _) = &self.0 {
+            if let Value::Sequence(algorithm_identifier, _) = &certificate[0] {
+                if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
+                    //TODO find better way to match
+                    match format!("{}", oid).as_ref() {
+                        "1.2.840.113549.1.1.11" => return Ok(SignatureAlgorithm::PKCS1_SHA256_RSA),
+                        _ => return Err(Error::X509Error),
+                    }
+                }
             }
         }
         Err(Error::X509Error)
