@@ -1,8 +1,9 @@
-use crate::Value;
+use crate::{Value, ObjectIdentifier};
 use crate::Error;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
+use std::fmt::{self, Debug, Formatter};
 
 pub struct Certificate<'a>(Value<'a>);
 
@@ -129,5 +130,50 @@ impl<'a> Certificate<'a> {
             }
         }
         Err(Error::X509Error)
+    }
+
+    pub fn extensions(&self) -> Result<Vec<Extension>, Error> {
+        let tbs_cert = self.tbs_cert()?;
+        if let Value::ContextSpecific(ctx, value) = tbs_cert.last().unwrap() {
+            if *ctx == 3 {
+                if let Value::Sequence(exts, _) = value.deref() {
+                    let mut res: Vec<Extension> = Vec::with_capacity(exts.len());
+                    for ext in exts {
+                        if let Value::Sequence(ext, _) = ext {
+                            if let Value::ObjectIdentifier(oid) = &ext[0] {
+                                if let Value::Boolean(critical) = &ext[1] {
+                                    if let Value::OctetString(data) = &ext[2] {
+                                        let extension = Extension(oid.clone(), critical.to_bool(), data.clone());
+                                        res.push(extension);
+                                    }
+                                } else {
+                                    let critical = false;
+                                    if let Value::OctetString(data) = &ext[1] {
+                                        let extension = Extension(oid.clone(), critical, data.clone());
+                                        res.push(extension);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return Ok(res);
+                }
+            }
+        }
+        Err(Error::X509Error)
+    }
+}
+
+pub struct Extension<'a>(ObjectIdentifier<'a>, bool, &'a [u8]);
+
+impl<'a> Debug for Extension<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "Extension: {} critical: {} data: {:x?}", self.0, self.1, self.2)
+    }
+}
+
+impl<'a> Extension<'a> {
+    pub fn data(&self) -> &[u8] {
+        self.2
     }
 }

@@ -64,7 +64,7 @@ impl From<ParseIntError> for Error {
 
 impl std::error::Error for Error {}
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ObjectIdentifier<'a>(&'a [u8]);
 
 impl<'a> ObjectIdentifier<'a> {
