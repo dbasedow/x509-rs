@@ -1,9 +1,9 @@
-use crate::{Value, ObjectIdentifier};
+use crate::der::{Value, ObjectIdentifier};
 use crate::Error;
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::{self, Debug, Formatter, Display};
 
 pub struct Certificate<'a>(Value<'a>);
 
@@ -13,8 +13,18 @@ pub enum Version {
     V3,
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            Version::V1 => write!(f, "1"),
+            Version::V2 => write!(f, "2"),
+            Version::V3 => write!(f, "3"),
+        }
+    }
+}
+
 pub enum SignatureAlgorithm {
-    PKCS1_SHA256_RSA,
+    Pkcs1Sha256Rsa,
 }
 
 impl TryFrom<i64> for Version {
@@ -35,17 +45,17 @@ impl<'a> Certificate<'a> {
         Certificate(value)
     }
 
-    pub fn serial(&self) -> Result<i64, Error> {
+    pub fn serial(&self) -> Result<num_bigint::BigInt, Error> {
         let tbs_cert = self.tbs_cert()?;
         if let Value::Integer(serial) = &tbs_cert[1] {
-            return Ok(serial.to_i64());
+            return Ok(serial.to_big_int());
         }
         Err(Error::X509Error)
     }
 
     pub fn version(&self) -> Result<Version, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::ContextSpecific(ctx, version) = &tbs_cert[0] {
+        if let Value::ContextSpecific(_, version) = &tbs_cert[0] {
             if let Value::Integer(version) = version.deref() {
                 return Ok(version.to_i64().try_into()?);
             }
@@ -123,7 +133,7 @@ impl<'a> Certificate<'a> {
                 if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
                     //TODO find better way to match
                     match format!("{}", oid).as_ref() {
-                        "1.2.840.113549.1.1.11" => return Ok(SignatureAlgorithm::PKCS1_SHA256_RSA),
+                        "1.2.840.113549.1.1.11" => return Ok(SignatureAlgorithm::Pkcs1Sha256Rsa),
                         _ => return Err(Error::X509Error),
                     }
                 }
