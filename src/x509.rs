@@ -5,6 +5,13 @@ use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
 use std::fmt::{self, Debug, Formatter, Display};
 
+const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
+const COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 6]);
+const ORGANIZATION_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 10]);
+const ORGANIZATIONAL_UNIT_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 11]);
+
+const SHA256_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 11]);
+
 pub struct Certificate<'a>(Value<'a>);
 
 pub enum Version {
@@ -159,9 +166,8 @@ impl<'a> Certificate<'a> {
         if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::Sequence(algorithm_identifier, _) = &certificate[0] {
                 if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
-                    //TODO find better way to match
-                    match format!("{}", oid).as_ref() {
-                        "1.2.840.113549.1.1.11" => return Ok(SignatureAlgorithm::Pkcs1Sha256Rsa),
+                    match oid {
+                        SHA256_WITH_RSA_OID => return Ok(SignatureAlgorithm::Pkcs1Sha256Rsa),
                         _ => return Err(Error::X509Error),
                     }
                 }
@@ -225,11 +231,11 @@ pub enum RelativeDistinguishedName<'a> {
 
 impl<'a> RelativeDistinguishedName<'a> {
     fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
-        match format!("{}", oid).as_str() {
-            "2.5.4.3" => Some(RelativeDistinguishedName::CommonName(value)),
-            "2.5.4.6" => Some(RelativeDistinguishedName::Country(value)),
-            "2.5.4.10" => Some(RelativeDistinguishedName::Organization(value)),
-            "2.5.4.11" => Some(RelativeDistinguishedName::OrganizationalUnit(value)),
+        match oid {
+            COMMON_NAME_OID => Some(RelativeDistinguishedName::CommonName(value)),
+            COUNTRY_OID => Some(RelativeDistinguishedName::Country(value)),
+            ORGANIZATION_OID => Some(RelativeDistinguishedName::Organization(value)),
+            ORGANIZATIONAL_UNIT_OID => Some(RelativeDistinguishedName::OrganizationalUnit(value)),
             s => {
                 println!("object identifier {} not supported", s);
                 None
