@@ -17,6 +17,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cert = Certificate::from_value(parsed);
         println!("version: {}", cert.version()?);
         println!("serial: {}", cert.serial()?);
+        let issuer = cert.issuer()?;
+        print!("issuer: ");
+        for (i, rdn) in issuer.iter().enumerate() {
+            if i != 0 {
+                print!(", ");
+            }
+            print!("{}", rdn);
+        }
+        println!();
+
+        let subject = cert.subject()?;
+        print!("subject: ");
+        for (i, rdn) in subject.iter().enumerate() {
+            if i != 0 {
+                print!(", ");
+            }
+            print!("{}", rdn);
+        }
+        println!();
         println!("valid from: {}", cert.valid_from()?);
         println!("valid to: {}", cert.valid_to()?);
 

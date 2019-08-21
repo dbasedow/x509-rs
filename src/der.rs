@@ -302,7 +302,7 @@ pub enum Value<'a> {
     OctetString(&'a [u8]),
     Null,
     ObjectIdentifier(ObjectIdentifier<'a>),
-    Sequence(Vec<Value<'a>>, &'a [u8]),
+    Sequence(Vec<Value<'a>>, &'a [u8]), // sequence, and raw slice
     UTCTime(UTCTime<'a>),
     GeneralizedTime(GeneralizedTime<'a>),
     PrintableString(PrintableString<'a>),
@@ -316,6 +316,9 @@ impl<'a> Display for Value<'a> {
         match self {
             Value::Boolean(b) => write!(f, "{:?}", b),
             Value::Integer(b) => write!(f, "{:?}", b),
+            Value::Utf8String(s) => write!(f, "{}", s),
+            Value::OctetString(s) => write!(f, "{:?}", s),
+            Value::PrintableString(s) => write!(f, "{}", s),
             _ => unimplemented!("display not implemented"),
         }
     }

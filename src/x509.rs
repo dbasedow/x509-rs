@@ -97,6 +97,34 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    pub fn issuer(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
+        self.get_rdns_at_offset(3)
+    }
+
+    pub fn subject(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
+        self.get_rdns_at_offset(5)
+    }
+
+    fn get_rdns_at_offset(&self, offset: usize) -> Result<Vec<RelativeDistinguishedName>, Error> {
+        let tbs_cert = self.tbs_cert()?;
+        if let Value::Sequence(entries, _) = &tbs_cert[offset] {
+            let mut result: Vec<RelativeDistinguishedName> = Vec::with_capacity(entries.len());
+            for e in entries {
+                if let Value::Set(s) = e {
+                    if let Value::Sequence(sub, _) = &s[0] {
+                        if let Value::ObjectIdentifier(oid) = &sub[0] {
+                            if let Some(rdn) = RelativeDistinguishedName::from_oid_and_string(&oid, &sub[1]) {
+                                result.push(rdn);
+                            }
+                        }
+                    }
+                }
+            }
+            return Ok(result);
+        }
+        Err(Error::X509Error)
+    }
+
     fn tbs_cert(&self) -> Result<&Vec<Value>, Error> {
         if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::Sequence(tbs_cert, _) = &certificate[0] {
@@ -185,5 +213,39 @@ impl<'a> Debug for Extension<'a> {
 impl<'a> Extension<'a> {
     pub fn data(&self) -> &[u8] {
         self.2
+    }
+}
+
+pub enum RelativeDistinguishedName<'a> {
+    CommonName(&'a Value<'a>),
+    Country(&'a Value<'a>),
+    Organization(&'a Value<'a>),
+    OrganizationalUnit(&'a Value<'a>),
+}
+
+impl<'a> RelativeDistinguishedName<'a> {
+    fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
+        match format!("{}", oid).as_str() {
+            "2.5.4.3" => Some(RelativeDistinguishedName::CommonName(value)),
+            "2.5.4.6" => Some(RelativeDistinguishedName::Country(value)),
+            "2.5.4.10" => Some(RelativeDistinguishedName::Organization(value)),
+            "2.5.4.11" => Some(RelativeDistinguishedName::OrganizationalUnit(value)),
+            s => {
+                println!("object identifier {} not supported", s);
+                None
+            }
+        }
+    }
+}
+
+impl<'a> Display for RelativeDistinguishedName<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        use RelativeDistinguishedName::*;
+        match self {
+            CommonName(cn) => write!(f, "CN={}", cn),
+            Country(c) => write!(f, "C={}", c),
+            Organization(o) => write!(f, "CN={}", o),
+            OrganizationalUnit(ou) => write!(f, "CN={}", ou),
+        }
     }
 }
