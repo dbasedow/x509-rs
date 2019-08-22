@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter, Debug};
 use chrono::prelude::*;
-use crate::Error;
+use crate::error::Error;
 use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Eq)]

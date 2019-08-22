@@ -1,9 +1,9 @@
-use crate::der::{Value, ObjectIdentifier};
-use crate::{Error, der};
+use crate::der::{self, Value, ObjectIdentifier};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
 use std::fmt::{self, Debug, Formatter, Display};
+use crate::error::Error;
 
 const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
 const COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 6]);
