@@ -39,6 +39,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("valid from: {}", cert.valid_from()?);
         println!("valid to: {}", cert.valid_to()?);
 
+        println!("Extensions");
+        for ext in cert.extensions()? {
+            print!("  {}:", ext.object_identifier());
+            if ext.critical() {
+                print!(" critical");
+            }
+            println!();
+            if let Ok(data) = ext.data() {
+                println!("    {:?}", data);
+            } else {
+                println!("    {:?}", ext.data_raw());
+            }
+        }
+
         let key = cert.public_key()?;
         let signature = cert.signature()?;
         let msg = cert.raw_tbs_cert()?;

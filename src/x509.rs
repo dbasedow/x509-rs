@@ -1,5 +1,5 @@
 use crate::der::{Value, ObjectIdentifier};
-use crate::Error;
+use crate::{Error, der};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
@@ -217,8 +217,24 @@ impl<'a> Debug for Extension<'a> {
 }
 
 impl<'a> Extension<'a> {
-    pub fn data(&self) -> &[u8] {
+    pub fn object_identifier(&self) -> &ObjectIdentifier<'a> {
+        &self.0
+    }
+
+    pub fn critical(&self) -> bool {
+        self.1
+    }
+
+    pub fn data_raw(&self) -> &[u8] {
         self.2
+    }
+
+    pub fn data(&self) -> Result<Value, Error> {
+        let (parsed, len) = der::parse_der(self.2)?;
+        if len < self.2.len() {
+            return Err(Error::ParseError);
+        }
+        Ok(parsed)
     }
 }
 
