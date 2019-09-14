@@ -166,6 +166,40 @@ impl<'a> Debug for PrintableString<'a> {
 }
 
 #[derive(PartialEq)]
+pub struct T61String<'a>(&'a [u8]);
+
+impl<'a> Display for T61String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", String::from_utf8_lossy(self.0))
+    }
+}
+
+impl<'a> Debug for T61String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
+pub struct IA5String<'a>(&'a [u8]);
+
+impl<'a> Display for IA5String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        if let Ok(s) = String::from_utf8(self.0.to_vec()) {
+            write!(f, "{}", s)
+        } else {
+            Err(fmt::Error::default())
+        }
+    }
+}
+
+impl<'a> Debug for IA5String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
 pub struct Utf8String<'a>(&'a [u8]);
 
 impl<'a> Display for Utf8String<'a> {
@@ -179,6 +213,26 @@ impl<'a> Display for Utf8String<'a> {
 }
 
 impl<'a> Debug for Utf8String<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
+pub struct BMPString<'a>(&'a [u8]);
+
+impl<'a> Display for BMPString<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        let u16s: Vec<u16> = self.0.chunks(2).map(|a| u16::from_be_bytes([a[0], a[1]])).collect();
+        if let Ok(s) = String::from_utf16(&u16s) {
+            write!(f, "{}", s)
+        } else {
+            Err(fmt::Error::default())
+        }
+    }
+}
+
+impl<'a> Debug for BMPString<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         write!(f, "\"{}\"", self)
     }
@@ -357,7 +411,10 @@ pub enum Value<'a> {
     UTCTime(UTCTime<'a>),
     GeneralizedTime(GeneralizedTime<'a>),
     PrintableString(PrintableString<'a>),
+    T61String(T61String<'a>),
+    IA5String(IA5String<'a>),
     Utf8String(Utf8String<'a>),
+    BMPString(BMPString<'a>),
     Set(Vec<Value<'a>>),
     ContextSpecific(u8, Box<Value<'a>>),
 }
@@ -370,7 +427,10 @@ impl<'a> Display for Value<'a> {
             Value::Utf8String(s) => write!(f, "{}", s),
             Value::OctetString(s) => write!(f, "{:?}", s),
             Value::PrintableString(s) => write!(f, "{}", s),
-            _ => unimplemented!("display not implemented"),
+            Value::IA5String(s) => write!(f, "{}", s),
+            Value::T61String(s) => write!(f, "{}", s),
+            Value::BMPString(s) => write!(f, "{}", s),
+            v => unimplemented!("display not implemented {:?}", v),
         }
     }
 }
@@ -449,8 +509,11 @@ pub fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x10 => Value::Sequence(parse_sequence(&tlv.value)?, &data[..consumed]),
         0x11 => parse_set(&tlv.value)?,
         0x13 => Value::PrintableString(PrintableString(tlv.value)),
+        0x14 => Value::T61String(T61String(tlv.value)),
+        0x16 => Value::IA5String(IA5String(tlv.value)),
         0x17 => parse_utc_time(&tlv.value)?,
         0x18 => parse_generalized_time(&tlv.value)?,
+        0x1e => Value::BMPString(BMPString(tlv.value)),
         t => {
             unimplemented!("{} is not implemented", t);
         }
