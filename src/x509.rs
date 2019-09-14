@@ -6,11 +6,37 @@ use std::fmt::{self, Debug, Formatter, Display};
 use crate::error::Error;
 
 const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
+const SERIAL_NUMBER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 5]);
 const COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 6]);
+const LOCALITY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 7]);
+const STATE_OR_PROVINCE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 8]);
+const STREET_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 9]);
 const ORGANIZATION_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 10]);
 const ORGANIZATIONAL_UNIT_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 11]);
+const DESCRIPTION_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 13]);
+const BUSINESS_CATEGORY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 15]);
+const POSTAL_ADDRESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 16]);
+const POSTAL_CODE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 17]);
+const POST_OFFICE_BOX_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 18]);
+const HOUSE_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 51]);
+const ORGANIZATION_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 97]);
 
+const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 17]);
+const UNSTRUCTURED_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 2]);
+const EMAIL_ADDRESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 1]);
+const JURISDICTION_OF_INCORPORATION_COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 3]);
+const JURISDICTION_OF_INCORPORATION_STATE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 2]);
+const JURISDICTION_OF_INCORPORATION_LOCALITY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 1]);
+const DOMAIN_COMPONENT_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[9, 146, 38, 137, 147, 242, 44, 100, 1, 25]);
+
+const SHA1_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 5]);
 const SHA256_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 11]);
+const SHA384_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 12]);
+const SHA512_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 13]);
+const ECDSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 2]);
+const ECDSA_WITH_SHA384_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 3]);
+const DSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[96, 134, 72, 1, 101, 3, 4, 3, 2]);
+const RSA_WITH_MD5_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 4]);
 
 pub struct Certificate<'a>(Value<'a>);
 
@@ -31,7 +57,14 @@ impl Display for Version {
 }
 
 pub enum SignatureAlgorithm {
+    Pkcs1Sha1Rsa,
     Pkcs1Sha256Rsa,
+    Pkcs1Sha384Rsa,
+    Pkcs1Sha512Rsa,
+    Pkcs1Sha256Ecdsa,
+    Pkcs1Sha384Ecdsa,
+    Pkcs1Sha256Dsa,
+    Pkcs1Md5Rsa,
 }
 
 impl TryFrom<i64> for Version {
@@ -47,14 +80,50 @@ impl TryFrom<i64> for Version {
     }
 }
 
+#[derive(Debug)]
+enum Part {
+    SerialNumber,
+    Signature,
+    Issuer,
+    Validity,
+    Subject,
+    SubjectPublicKeyInfo,
+    IssuerUniqueID,
+    SubjectUniqueID,
+    Extensions,
+}
+
 impl<'a> Certificate<'a> {
+    fn index_for(&self, part: Part) -> Result<usize, Error> {
+        use Version::*;
+        use Part::*;
+
+        let version = self.version()?;
+        match (part, version) {
+            (SerialNumber, V1) => Ok(0),
+            (SerialNumber, _) => Ok(1),
+            (Signature, V1) => Ok(1),
+            (Signature, _) => Ok(2),
+            (Issuer, V1) => Ok(2),
+            (Issuer, _) => Ok(3),
+            (Validity, V1) => Ok(3),
+            (Validity, _) => Ok(4),
+            (Subject, V1) => Ok(4),
+            (Subject, _) => Ok(5),
+            (SubjectPublicKeyInfo, V1) => Ok(5),
+            (SubjectPublicKeyInfo, _) => Ok(6),
+            (Extensions, _) => Ok(self.tbs_cert()?.len() - 1),
+            (p, v) => unimplemented!("not implemented: ({:?}, {})", p, v),
+        }
+    }
     pub fn from_value(value: Value<'a>) -> Certificate<'a> {
         Certificate(value)
     }
 
     pub fn serial(&self) -> Result<num_bigint::BigInt, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Integer(serial) = &tbs_cert[1] {
+        let index = self.index_for(Part::SerialNumber)?;
+        if let Value::Integer(serial) = &tbs_cert[index] {
             return Ok(serial.to_big_int());
         }
         Err(Error::X509Error)
@@ -66,6 +135,8 @@ impl<'a> Certificate<'a> {
             if let Value::Integer(version) = version.deref() {
                 return Ok(version.to_i64().try_into()?);
             }
+        } else {
+            return Ok(Version::V1);
         }
         Err(Error::X509Error)
     }
@@ -82,7 +153,8 @@ impl<'a> Certificate<'a> {
 
     pub fn valid_from(&self) -> Result<DateTime<FixedOffset>, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Sequence(validty, _) = &tbs_cert[4] {
+        let index = self.index_for(Part::Validity)?;
+        if let Value::Sequence(validty, _) = &tbs_cert[index] {
             return match &validty[0] {
                 Value::UTCTime(dt) => dt.to_datetime(),
                 Value::GeneralizedTime(dt) => dt.to_datetime(),
@@ -94,7 +166,8 @@ impl<'a> Certificate<'a> {
 
     pub fn valid_to(&self) -> Result<DateTime<FixedOffset>, Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Sequence(validty, _) = &tbs_cert[4] {
+        let index = self.index_for(Part::Validity)?;
+        if let Value::Sequence(validty, _) = &tbs_cert[index] {
             return match &validty[1] {
                 Value::UTCTime(dt) => dt.to_datetime(),
                 Value::GeneralizedTime(dt) => dt.to_datetime(),
@@ -105,11 +178,13 @@ impl<'a> Certificate<'a> {
     }
 
     pub fn issuer(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
-        self.get_rdns_at_offset(3)
+        let index = self.index_for(Part::Issuer)?;
+        self.get_rdns_at_offset(index)
     }
 
     pub fn subject(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
-        self.get_rdns_at_offset(5)
+        let index = self.index_for(Part::Subject)?;
+        self.get_rdns_at_offset(index)
     }
 
     fn get_rdns_at_offset(&self, offset: usize) -> Result<Vec<RelativeDistinguishedName>, Error> {
@@ -152,7 +227,8 @@ impl<'a> Certificate<'a> {
 
     pub fn public_key(&self) -> Result<&[u8], Error> {
         let tbs_cert = self.tbs_cert()?;
-        if let Value::Sequence(seq, _) = &tbs_cert[6] {
+        let index = self.index_for(Part::SubjectPublicKeyInfo)?;
+        if let Value::Sequence(seq, _) = &tbs_cert[index] {
             if let Value::BitString(key) = &seq[1] {
                 let (_, data) = key.data();
                 return Ok(data);
@@ -162,21 +238,29 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
-    pub fn signature_algorithm(&self) -> Result<SignatureAlgorithm, Error> {
+    pub fn signature_algorithm_unsigned(&self) -> Result<SignatureAlgorithm, Error> {
         if let Value::Sequence(certificate, _) = &self.0 {
-            if let Value::Sequence(algorithm_identifier, _) = &certificate[0] {
+            if let Value::Sequence(algorithm_identifier, _) = &certificate[1] {
                 if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
-                    match oid {
-                        SHA256_WITH_RSA_OID => return Ok(SignatureAlgorithm::Pkcs1Sha256Rsa),
-                        _ => return Err(Error::X509Error),
-                    }
+                    return Ok(lookup_algorithm_identifier(oid));
                 }
             }
         }
         Err(Error::X509Error)
     }
 
-    pub fn extensions(&self) -> Result<Vec<Extension>, Error> {
+    pub fn signature_algorithm(&self) -> Result<SignatureAlgorithm, Error> {
+        let tbs_cert = self.tbs_cert()?;
+        let index = self.index_for(Part::Signature)?;
+        if let Value::Sequence(algorithm_identifier, _) = &tbs_cert[index] {
+            if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
+                return Ok(lookup_algorithm_identifier(oid));
+            }
+        }
+        Err(Error::X509Error)
+    }
+
+    pub fn extensions(&self) -> Result<Option<Vec<Extension>>, Error> {
         let tbs_cert = self.tbs_cert()?;
         if let Value::ContextSpecific(ctx, value) = tbs_cert.last().unwrap() {
             if *ctx == 3 {
@@ -200,11 +284,25 @@ impl<'a> Certificate<'a> {
                             }
                         }
                     }
-                    return Ok(res);
+                    return Ok(Some(res));
                 }
             }
         }
-        Err(Error::X509Error)
+        Ok(None)
+    }
+}
+
+fn lookup_algorithm_identifier(oid: &ObjectIdentifier) -> SignatureAlgorithm {
+    match oid {
+        SHA1_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha1Rsa,
+        SHA256_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha256Rsa,
+        SHA384_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha384Rsa,
+        SHA512_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha512Rsa,
+        ECDSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Ecdsa,
+        ECDSA_WITH_SHA384_OID => SignatureAlgorithm::Pkcs1Sha384Ecdsa,
+        DSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Dsa,
+        RSA_WITH_MD5_OID => SignatureAlgorithm::Pkcs1Md5Rsa,
+        o => unimplemented!("unknown oid: {}, ({:?})", o, o.0),
     }
 }
 
@@ -240,20 +338,58 @@ impl<'a> Extension<'a> {
 
 pub enum RelativeDistinguishedName<'a> {
     CommonName(&'a Value<'a>),
+    SerialNumber(&'a Value<'a>),
     Country(&'a Value<'a>),
+    StateOrProvince(&'a Value<'a>),
+    Street(&'a Value<'a>),
+    Locality(&'a Value<'a>),
     Organization(&'a Value<'a>),
     OrganizationalUnit(&'a Value<'a>),
+    Description(&'a Value<'a>),
+    BusinessCategory(&'a Value<'a>),
+    PostalAddress(&'a Value<'a>),
+    PostalCode(&'a Value<'a>),
+    PostOfficeBox(&'a Value<'a>),
+    HouseIdentifier(&'a Value<'a>),
+    OrganizationIdentifier(&'a Value<'a>),
+
+    SubjectAlternativeName(&'a Value<'a>),
+    UnstructuredName(&'a Value<'a>),
+    EmailAddress(&'a Value<'a>),
+    JurisdictionOfIncorporationCountry(&'a Value<'a>),
+    JurisdictionOfIncorporationState(&'a Value<'a>),
+    JurisdictionOfIncorporationLocality(&'a Value<'a>),
+    DomainComponent(&'a Value<'a>),
 }
 
 impl<'a> RelativeDistinguishedName<'a> {
     fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
         match oid {
             COMMON_NAME_OID => Some(RelativeDistinguishedName::CommonName(value)),
+            SERIAL_NUMBER_OID => Some(RelativeDistinguishedName::SerialNumber(value)),
             COUNTRY_OID => Some(RelativeDistinguishedName::Country(value)),
+            STATE_OR_PROVINCE_OID => Some(RelativeDistinguishedName::StateOrProvince(value)),
+            STREET_OID => Some(RelativeDistinguishedName::Street(value)),
+            LOCALITY_OID => Some(RelativeDistinguishedName::Locality(value)),
             ORGANIZATION_OID => Some(RelativeDistinguishedName::Organization(value)),
             ORGANIZATIONAL_UNIT_OID => Some(RelativeDistinguishedName::OrganizationalUnit(value)),
+            DESCRIPTION_OID => Some(RelativeDistinguishedName::Description(value)),
+            BUSINESS_CATEGORY_OID => Some(RelativeDistinguishedName::BusinessCategory(value)),
+            POSTAL_ADDRESS_OID => Some(RelativeDistinguishedName::PostalAddress(value)),
+            POSTAL_CODE_OID => Some(RelativeDistinguishedName::PostalCode(value)),
+            POST_OFFICE_BOX_OID => Some(RelativeDistinguishedName::PostOfficeBox(value)),
+            HOUSE_IDENTIFIER_OID => Some(RelativeDistinguishedName::HouseIdentifier(value)),
+            ORGANIZATION_IDENTIFIER_OID => Some(RelativeDistinguishedName::OrganizationIdentifier(value)),
+
+            SUBJECT_ALTERNATIVE_NAME_OID => Some(RelativeDistinguishedName::SubjectAlternativeName(value)),
+            UNSTRUCTURED_NAME_OID => Some(RelativeDistinguishedName::UnstructuredName(value)),
+            EMAIL_ADDRESS_OID => Some(RelativeDistinguishedName::EmailAddress(value)),
+            JURISDICTION_OF_INCORPORATION_COUNTRY_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationCountry(value)),
+            JURISDICTION_OF_INCORPORATION_STATE_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationState(value)),
+            JURISDICTION_OF_INCORPORATION_LOCALITY_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationLocality(value)),
+            DOMAIN_COMPONENT_OID => Some(RelativeDistinguishedName::DomainComponent(value)),
             s => {
-                println!("object identifier {} not supported", s);
+                eprintln!("object identifier {} not supported ({:?})", s, s.0);
                 None
             }
         }
@@ -265,9 +401,28 @@ impl<'a> Display for RelativeDistinguishedName<'a> {
         use RelativeDistinguishedName::*;
         match self {
             CommonName(cn) => write!(f, "CN={}", cn),
+            SerialNumber(sn) => write!(f, "serial-number={}", sn),
             Country(c) => write!(f, "C={}", c),
-            Organization(o) => write!(f, "CN={}", o),
-            OrganizationalUnit(ou) => write!(f, "CN={}", ou),
+            StateOrProvince(s) => write!(f, "S={}", s),
+            Street(s) => write!(f, "street={}", s),
+            Locality(l) => write!(f, "L={}", l),
+            Organization(o) => write!(f, "O={}", o),
+            OrganizationalUnit(ou) => write!(f, "OU={}", ou),
+            Description(d) => write!(f, "description={}", d),
+            BusinessCategory(bc) => write!(f, "business-category={}", bc),
+            PostalAddress(pa) => write!(f, "postal-address={}", pa),
+            PostalCode(pc) => write!(f, "postal-code={}", pc),
+            PostOfficeBox(pob) => write!(f, "po-box={}", pob),
+            HouseIdentifier(h) => write!(f, "house-id={}", h),
+            OrganizationIdentifier(id) => write!(f, "org-id={}", id),
+
+            SubjectAlternativeName(e) => write!(f, "SAN={}", e),
+            UnstructuredName(e) => write!(f, "unstructured-name={}", e),
+            EmailAddress(e) => write!(f, "email={}", e),
+            JurisdictionOfIncorporationCountry(c) => write!(f, "jurisdiction-of-inc-country={}", c),
+            JurisdictionOfIncorporationState(c) => write!(f, "jurisdiction-of-inc-state={}", c),
+            JurisdictionOfIncorporationLocality(c) => write!(f, "jurisdiction-of-inc-locality={}", c),
+            DomainComponent(dc) => write!(f, "DC={}", dc),
         }
     }
 }
