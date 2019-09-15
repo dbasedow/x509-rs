@@ -19,6 +19,8 @@ const BUSINESS_CATEGORY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85
 const POSTAL_ADDRESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 16]);
 const POSTAL_CODE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 17]);
 const POST_OFFICE_BOX_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 18]);
+const TELEPHONE_NUMBER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 20]);
+const INITIALS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 43]);
 const HOUSE_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 51]);
 const ORGANIZATION_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 97]);
 
@@ -376,6 +378,8 @@ pub enum RelativeDistinguishedName<'a> {
     PostalAddress(&'a Value<'a>),
     PostalCode(&'a Value<'a>),
     PostOfficeBox(&'a Value<'a>),
+    TelephoneNumber(&'a Value<'a>),
+    Initials(&'a Value<'a>),
     HouseIdentifier(&'a Value<'a>),
     OrganizationIdentifier(&'a Value<'a>),
 
@@ -406,6 +410,8 @@ impl<'a> RelativeDistinguishedName<'a> {
             POSTAL_ADDRESS_OID => Some(RelativeDistinguishedName::PostalAddress(value)),
             POSTAL_CODE_OID => Some(RelativeDistinguishedName::PostalCode(value)),
             POST_OFFICE_BOX_OID => Some(RelativeDistinguishedName::PostOfficeBox(value)),
+            TELEPHONE_NUMBER_OID => Some(RelativeDistinguishedName::TelephoneNumber(value)),
+            INITIALS_OID => Some(RelativeDistinguishedName::Initials(value)),
             HOUSE_IDENTIFIER_OID => Some(RelativeDistinguishedName::HouseIdentifier(value)),
             ORGANIZATION_IDENTIFIER_OID => Some(RelativeDistinguishedName::OrganizationIdentifier(value)),
 
@@ -443,6 +449,8 @@ impl<'a> Display for RelativeDistinguishedName<'a> {
             PostalAddress(pa) => write!(f, "postal-address={}", pa),
             PostalCode(pc) => write!(f, "postal-code={}", pc),
             PostOfficeBox(pob) => write!(f, "po-box={}", pob),
+            TelephoneNumber(tn) => write!(f, "phone={}", tn),
+            Initials(i) => write!(f, "initials={}", i),
             HouseIdentifier(h) => write!(f, "house-id={}", h),
             OrganizationIdentifier(id) => write!(f, "org-id={}", id),
 
