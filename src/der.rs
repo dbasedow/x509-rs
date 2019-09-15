@@ -393,6 +393,22 @@ impl<'a> Debug for GeneralizedTime<'a> {
 pub struct BitString<'a>(&'a [u8]);
 
 impl<'a> BitString<'a> {
+    pub fn bit_at(&self, index: usize) -> Result<bool, Error> {
+        // First Byte contains amount of padding in bits
+        let len = (self.0.len() - 1) * 8 - self.0[0] as usize;
+        if index + 1 > len {
+            return Err(Error::ParseError);
+        }
+        // add one to byte offset, since first byte in the bit string is the padding size
+        let byte_offset = index / 8 + 1;
+        let bit_offset = (index % 8) as u8;
+
+        let mask = 0x80 >> bit_offset;
+        let byte = self.0[byte_offset];
+
+        Ok(byte & mask == mask)
+    }
+
     pub fn data(&self) -> (u8, &'a [u8]) {
         (self.0[0], &self.0[1..])
     }

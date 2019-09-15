@@ -1,6 +1,7 @@
 pub mod der;
 pub mod error;
 pub mod x509;
+pub mod extensions;
 
 pub use error::Error;
 pub use x509::Certificate;

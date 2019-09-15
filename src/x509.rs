@@ -4,6 +4,7 @@ use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
 use std::fmt::{self, Debug, Formatter, Display};
 use crate::error::Error;
+use crate::extensions::ExtensionType;
 
 const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
 const SERIAL_NUMBER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 5]);
@@ -21,6 +22,8 @@ const POST_OFFICE_BOX_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 
 const HOUSE_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 51]);
 const ORGANIZATION_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 97]);
 
+const DUNS_BUSINESS_ID_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 132, 7, 1]);
+const LEGAL_ENTITY_ID_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 131, 152, 42, 1]);
 const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 17]);
 const UNSTRUCTURED_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 2]);
 const EMAIL_ADDRESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 1]);
@@ -29,12 +32,14 @@ const JURISDICTION_OF_INCORPORATION_STATE_OID: &ObjectIdentifier<'static> = &Obj
 const JURISDICTION_OF_INCORPORATION_LOCALITY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 1]);
 const DOMAIN_COMPONENT_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[9, 146, 38, 137, 147, 242, 44, 100, 1, 25]);
 
+const SHA1_WITH_RSA_OBSOLETE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 14, 3, 2, 29]);
 const SHA1_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 5]);
 const SHA256_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 11]);
 const SHA384_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 12]);
 const SHA512_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 13]);
 const ECDSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 2]);
 const ECDSA_WITH_SHA384_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 3]);
+const ECDSA_WITH_SHA512_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 4]);
 const DSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[96, 134, 72, 1, 101, 3, 4, 3, 2]);
 const RSA_WITH_MD5_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 4]);
 
@@ -56,6 +61,7 @@ impl Display for Version {
     }
 }
 
+#[derive(Debug)]
 pub enum SignatureAlgorithm {
     Pkcs1Sha1Rsa,
     Pkcs1Sha256Rsa,
@@ -63,6 +69,7 @@ pub enum SignatureAlgorithm {
     Pkcs1Sha512Rsa,
     Pkcs1Sha256Ecdsa,
     Pkcs1Sha384Ecdsa,
+    Pkcs1Sha512Ecdsa,
     Pkcs1Sha256Dsa,
     Pkcs1Md5Rsa,
 }
@@ -98,20 +105,21 @@ impl<'a> Certificate<'a> {
         use Version::*;
         use Part::*;
 
-        let version = self.version()?;
-        match (part, version) {
-            (SerialNumber, V1) => Ok(0),
-            (SerialNumber, _) => Ok(1),
-            (Signature, V1) => Ok(1),
-            (Signature, _) => Ok(2),
-            (Issuer, V1) => Ok(2),
-            (Issuer, _) => Ok(3),
-            (Validity, V1) => Ok(3),
-            (Validity, _) => Ok(4),
-            (Subject, V1) => Ok(4),
-            (Subject, _) => Ok(5),
-            (SubjectPublicKeyInfo, V1) => Ok(5),
-            (SubjectPublicKeyInfo, _) => Ok(6),
+        let version = self.version_no_default()?;
+        let has_explicit_version = version.is_some();
+        match (part, has_explicit_version) {
+            (SerialNumber, false) => Ok(0),
+            (SerialNumber, true) => Ok(1),
+            (Signature, false) => Ok(1),
+            (Signature, true) => Ok(2),
+            (Issuer, false) => Ok(2),
+            (Issuer, true) => Ok(3),
+            (Validity, false) => Ok(3),
+            (Validity, true) => Ok(4),
+            (Subject, false) => Ok(4),
+            (Subject, true) => Ok(5),
+            (SubjectPublicKeyInfo, false) => Ok(5),
+            (SubjectPublicKeyInfo, true) => Ok(6),
             (Extensions, _) => Ok(self.tbs_cert()?.len() - 1),
             (p, v) => unimplemented!("not implemented: ({:?}, {})", p, v),
         }
@@ -130,15 +138,20 @@ impl<'a> Certificate<'a> {
     }
 
     pub fn version(&self) -> Result<Version, Error> {
+        match self.version_no_default()? {
+            Some(v) => Ok(v),
+            None => Ok(Version::V1),
+        }
+    }
+
+    fn version_no_default(&self) -> Result<Option<Version>, Error> {
         let tbs_cert = self.tbs_cert()?;
         if let Value::ContextSpecific(_, version) = &tbs_cert[0] {
             if let Value::Integer(version) = version.deref() {
-                return Ok(version.to_i64().try_into()?);
+                return Ok(Some(version.to_i64().try_into()?));
             }
-        } else {
-            return Ok(Version::V1);
         }
-        Err(Error::X509Error)
+        Ok(None)
     }
 
     pub fn signature(&self) -> Result<&[u8], Error> {
@@ -290,16 +303,32 @@ impl<'a> Certificate<'a> {
         }
         Ok(None)
     }
+
+    pub fn self_signed(&self) -> Result<bool, Error> {
+        let subject = self.subject()?;
+        let issuer = self.issuer()?;
+        if subject.len() == issuer.len() {
+            for i in 0..subject.len() {
+                if subject[i] != issuer[i] {
+                    return Ok(false);
+                }
+            }
+            return Ok(true);
+        }
+        Ok(false)
+    }
 }
 
 fn lookup_algorithm_identifier(oid: &ObjectIdentifier) -> SignatureAlgorithm {
     match oid {
         SHA1_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha1Rsa,
+        SHA1_WITH_RSA_OBSOLETE_OID => SignatureAlgorithm::Pkcs1Sha1Rsa,
         SHA256_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha256Rsa,
         SHA384_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha384Rsa,
         SHA512_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha512Rsa,
         ECDSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Ecdsa,
         ECDSA_WITH_SHA384_OID => SignatureAlgorithm::Pkcs1Sha384Ecdsa,
+        ECDSA_WITH_SHA512_OID => SignatureAlgorithm::Pkcs1Sha512Ecdsa,
         DSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Dsa,
         RSA_WITH_MD5_OID => SignatureAlgorithm::Pkcs1Md5Rsa,
         o => unimplemented!("unknown oid: {}, ({:?})", o, o.0),
@@ -327,15 +356,12 @@ impl<'a> Extension<'a> {
         self.2
     }
 
-    pub fn data(&self) -> Result<Value, Error> {
-        let (parsed, len) = der::parse_der(self.2)?;
-        if len < self.2.len() {
-            return Err(Error::ParseError);
-        }
-        Ok(parsed)
+    pub fn data(&self) -> Result<ExtensionType, Error> {
+        ExtensionType::new(&self.0, self.2)
     }
 }
 
+#[derive(PartialEq)]
 pub enum RelativeDistinguishedName<'a> {
     CommonName(&'a Value<'a>),
     SerialNumber(&'a Value<'a>),
@@ -353,6 +379,8 @@ pub enum RelativeDistinguishedName<'a> {
     HouseIdentifier(&'a Value<'a>),
     OrganizationIdentifier(&'a Value<'a>),
 
+    DunsBusinessId(&'a Value<'a>),
+    LegalEntityId(&'a Value<'a>),
     SubjectAlternativeName(&'a Value<'a>),
     UnstructuredName(&'a Value<'a>),
     EmailAddress(&'a Value<'a>),
@@ -381,6 +409,8 @@ impl<'a> RelativeDistinguishedName<'a> {
             HOUSE_IDENTIFIER_OID => Some(RelativeDistinguishedName::HouseIdentifier(value)),
             ORGANIZATION_IDENTIFIER_OID => Some(RelativeDistinguishedName::OrganizationIdentifier(value)),
 
+            DUNS_BUSINESS_ID_OID => Some(RelativeDistinguishedName::DunsBusinessId(value)),
+            LEGAL_ENTITY_ID_OID => Some(RelativeDistinguishedName::LegalEntityId(value)),
             SUBJECT_ALTERNATIVE_NAME_OID => Some(RelativeDistinguishedName::SubjectAlternativeName(value)),
             UNSTRUCTURED_NAME_OID => Some(RelativeDistinguishedName::UnstructuredName(value)),
             EMAIL_ADDRESS_OID => Some(RelativeDistinguishedName::EmailAddress(value)),
@@ -416,6 +446,8 @@ impl<'a> Display for RelativeDistinguishedName<'a> {
             HouseIdentifier(h) => write!(f, "house-id={}", h),
             OrganizationIdentifier(id) => write!(f, "org-id={}", id),
 
+            DunsBusinessId(e) => write!(f, "DUNS-id={}", e),
+            LegalEntityId(e) => write!(f, "LEI-id={}", e),
             SubjectAlternativeName(e) => write!(f, "SAN={}", e),
             UnstructuredName(e) => write!(f, "unstructured-name={}", e),
             EmailAddress(e) => write!(f, "email={}", e),
