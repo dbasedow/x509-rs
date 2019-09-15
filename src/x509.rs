@@ -1,4 +1,4 @@
-use crate::der::{self, Value, ObjectIdentifier};
+use crate::der::{Value, ObjectIdentifier};
 use std::convert::{TryFrom, TryInto};
 use std::ops::Deref;
 use chrono::{DateTime, FixedOffset};
@@ -104,7 +104,6 @@ enum Part {
 
 impl<'a> Certificate<'a> {
     fn index_for(&self, part: Part) -> Result<usize, Error> {
-        use Version::*;
         use Part::*;
 
         let version = self.version_no_default()?;
