@@ -1,14 +1,17 @@
 use crate::der::{ObjectIdentifier, Value, parse_der, BitString};
 use crate::error::Error;
 use crate::x509::RelativeDistinguishedName;
+use std::net::{IpAddr, Ipv4Addr};
 
 const KEY_USAGE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 15]);
+const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 17]);
 const BASIC_CONSTRAINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 19]);
 const CRL_DISTRIBUTION_POINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 31]);
 
 #[derive(Debug)]
 pub enum ExtensionType<'a> {
     KeyUsage(KeyUsage<'a>),
+    SubjectAlternativeNames(SubjectAlternativeNames<'a>),
     BasicConstraints(BasicConstraints<'a>),
     CrlDistributionPoints(CrlDistributionPoints<'a>),
     Unknown(&'a ObjectIdentifier<'a>, &'a [u8]),
@@ -18,6 +21,7 @@ impl<'a> ExtensionType<'a> {
     pub fn new(oid: &'a ObjectIdentifier, data: &'a [u8]) -> Result<ExtensionType<'a>, Error> {
         match oid {
             KEY_USAGE_OID => Ok(ExtensionType::KeyUsage(KeyUsage::new(data)?)),
+            SUBJECT_ALTERNATIVE_NAME_OID => Ok(ExtensionType::SubjectAlternativeNames(SubjectAlternativeNames::new(data)?)),
             BASIC_CONSTRAINTS_OID => Ok(ExtensionType::BasicConstraints(BasicConstraints::new(data)?)),
             CRL_DISTRIBUTION_POINTS_OID => Ok(ExtensionType::CrlDistributionPoints(CrlDistributionPoints::new(data)?)),
             _ => Ok(ExtensionType::Unknown(oid, data)),
@@ -173,16 +177,22 @@ impl<'a> DistributionPointName<'a> {
 
 #[derive(Debug)]
 pub enum GeneralName<'a> {
+    Rfc822Address(String),
+    DnsName(String),
     URI(String),
     DirectoryName(Vec<RelativeDistinguishedName<'a>>),
+    IpAddress(IpAddr),
 }
 
 impl<'a> GeneralName<'a> {
     fn new(value: &'a Value) -> Result<GeneralName<'a>, Error> {
         if let Value::ContextSpecificRaw(ctx, content) = value {
             match ctx {
+                1 => return Ok(GeneralName::Rfc822Address(String::from_utf8(content.to_vec())?)),
+                2 => return Ok(GeneralName::DnsName(String::from_utf8(content.to_vec())?)),
                 6 => return Ok(GeneralName::URI(String::from_utf8(content.to_vec())?)),
-                ctx => unimplemented!("GeneralName context {}", ctx),
+                7 if content.len() == 4 => return Ok(GeneralName::IpAddress(IpAddr::V4(Ipv4Addr::new(content[0], content[1], content[2], content[3])))),
+                ctx => unimplemented!("GeneralName context {}, {:x?}", ctx, content),
             }
         }
         if let Value::ContextSpecific(ctx, content) = value {
@@ -202,10 +212,32 @@ impl<'a> GeneralName<'a> {
                     }
                     return Ok(GeneralName::DirectoryName(result));
                 }
-                (ctx, _) => unimplemented!("GeneralName context {}", ctx),
+                (ctx, _) => unimplemented!("GeneralName context {}, {:?}", ctx, content),
             }
         }
 
+        Err(Error::X509Error)
+    }
+}
+
+#[derive(Debug)]
+pub struct SubjectAlternativeNames<'a>(Vec<Value<'a>>);
+
+impl<'a> SubjectAlternativeNames<'a> {
+    fn new(data: &'a [u8]) -> Result<SubjectAlternativeNames<'a>, Error> {
+        if let (Value::Sequence(s, _), _) = parse_der(data)? {
+            return Ok(SubjectAlternativeNames(s));
+        }
+
+        Err(Error::X509Error)
+    }
+
+    pub fn names(&self) -> Result<Vec<GeneralName>, Error> {
+        let mut sans = Vec::with_capacity(self.0.len());
+        for v in &self.0 {
+            sans.push(GeneralName::new(&v)?);
+        }
+        return Ok(sans);
         Err(Error::X509Error)
     }
 }
