@@ -58,20 +58,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("Extensions");
                 for ext in extensions {
                     let s = format!("{}", ext.object_identifier());
-                    if s == "1.3.6.1.4.1.11129.2.4.2".to_string() {
-                        //eprintln!("{:x?}", ext.data_raw());
-                    }
                     print!("  {}:", s);
                     if ext.critical() {
-                        let &c = dist.get(&s).unwrap_or(&0);
-                        let d = c + 1;
-                        dist.insert(s, d);
                         print!(" critical");
                     }
                     println!();
                     match ext.data()? {
                         ExtensionType::KeyUsage(ku) => println!("digital_signature: {}", ku.digital_signature()?),
-                        e => println!("{:x?}", e),
+                        ExtensionType::BasicConstraints(bc) => println!("basic constraints: ca: {} len: {:?}", bc.is_ca()?, bc.path_len_constraint().unwrap_or(None)),
+                        ExtensionType::CrlDistributionPoints(ps) => print!("{:?}", ps.distribution_points()?),
+                        e => {
+                            let &c = dist.get(&s).unwrap_or(&0);
+                            let d = c + 1;
+                            dist.insert(s, d);
+                            println!("{:x?}", e)
+                        }
                     }
                 }
             }

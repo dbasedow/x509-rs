@@ -362,7 +362,7 @@ impl<'a> Extension<'a> {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum RelativeDistinguishedName<'a> {
     CommonName(&'a Value<'a>),
     SerialNumber(&'a Value<'a>),
@@ -394,7 +394,7 @@ pub enum RelativeDistinguishedName<'a> {
 }
 
 impl<'a> RelativeDistinguishedName<'a> {
-    fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
+    pub fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
         match oid {
             COMMON_NAME_OID => Some(RelativeDistinguishedName::CommonName(value)),
             SERIAL_NUMBER_OID => Some(RelativeDistinguishedName::SerialNumber(value)),

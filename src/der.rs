@@ -183,6 +183,15 @@ impl<'a> Debug for T61String<'a> {
 #[derive(PartialEq)]
 pub struct IA5String<'a>(&'a [u8]);
 
+impl<'a> IA5String<'a> {
+    pub fn to_string(&self) -> Result<String, Error> {
+        if let Ok(s) = String::from_utf8(self.0.to_vec()) {
+            return Ok(s);
+        }
+        Err(Error::ParseError)
+    }
+}
+
 impl<'a> Display for IA5String<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         if let Ok(s) = String::from_utf8(self.0.to_vec()) {
@@ -433,6 +442,7 @@ pub enum Value<'a> {
     BMPString(BMPString<'a>),
     Set(Vec<Value<'a>>),
     ContextSpecific(u8, Box<Value<'a>>),
+    ContextSpecificRaw(u8, &'a [u8]),
 }
 
 impl<'a> Display for Value<'a> {
@@ -509,9 +519,13 @@ fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
 
 pub fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
     let (tlv, consumed) = get_tlv(data)?;
-    if tlv.is_context_specific() && tlv.is_constructed_type() {
-        let (v, _) = parse_der(&tlv.value)?;
-        return Ok((Value::ContextSpecific(tlv.get_data_type(), Box::new(v)), consumed));
+    if tlv.is_context_specific() {
+        if tlv.is_constructed_type() {
+            let (v, _) = parse_der(&tlv.value)?;
+            return Ok((Value::ContextSpecific(tlv.get_data_type(), Box::new(v)), consumed));
+        } else {
+            return Ok((Value::ContextSpecificRaw(tlv.get_data_type(), &tlv.value), consumed));
+        }
     }
 
     let value = match tlv.get_data_type() {
