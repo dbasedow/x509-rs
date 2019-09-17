@@ -7,6 +7,7 @@ use crate::error::Error;
 use crate::extensions::ExtensionType;
 
 const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
+const SURNAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 4]);
 const SERIAL_NUMBER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 5]);
 const COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 6]);
 const LOCALITY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 7]);
@@ -365,6 +366,7 @@ impl<'a> Extension<'a> {
 #[derive(Debug, PartialEq)]
 pub enum RelativeDistinguishedName<'a> {
     CommonName(&'a Value<'a>),
+    Surname(&'a Value<'a>),
     SerialNumber(&'a Value<'a>),
     Country(&'a Value<'a>),
     StateOrProvince(&'a Value<'a>),
@@ -397,6 +399,7 @@ impl<'a> RelativeDistinguishedName<'a> {
     pub fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
         match oid {
             COMMON_NAME_OID => Some(RelativeDistinguishedName::CommonName(value)),
+            SURNAME_OID => Some(RelativeDistinguishedName::Surname(value)),
             SERIAL_NUMBER_OID => Some(RelativeDistinguishedName::SerialNumber(value)),
             COUNTRY_OID => Some(RelativeDistinguishedName::Country(value)),
             STATE_OR_PROVINCE_OID => Some(RelativeDistinguishedName::StateOrProvince(value)),
@@ -436,6 +439,7 @@ impl<'a> Display for RelativeDistinguishedName<'a> {
         use RelativeDistinguishedName::*;
         match self {
             CommonName(cn) => write!(f, "CN={}", cn),
+            Surname(cn) => write!(f, "SN={}", cn),
             SerialNumber(sn) => write!(f, "serial-number={}", sn),
             Country(c) => write!(f, "C={}", c),
             StateOrProvince(s) => write!(f, "S={}", s),
