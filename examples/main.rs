@@ -64,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     println!();
                     match ext.data()? {
+                        ExtensionType::SubjectKeyIdentifier(ski) => println!("subject key id: {:x?}", ski.key_identifier()?),
                         ExtensionType::KeyUsage(ku) => println!("digital_signature: {}", ku.digital_signature()?),
                         ExtensionType::BasicConstraints(bc) => println!("basic constraints: ca: {} len: {:?}", bc.is_ca()?, bc.path_len_constraint().unwrap_or(None)),
                         ExtensionType::CrlDistributionPoints(ps) => print!("{:?}", ps.distribution_points()?),
