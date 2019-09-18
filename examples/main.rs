@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ExtensionType::CrlDistributionPoints(ps) => print!("{:?}", ps.distribution_points()?),
                         ExtensionType::SubjectAlternativeNames(sans) => print!("{:?}", sans.names()?),
                         ExtensionType::AuthorityKeyIdentifier(aki) => print!("{:?}", aki.authority_cert_serial_number()?),
+                        ExtensionType::ExtendedKeyUsage(eku) => println!("{:?}", eku.key_purposes()?),
                         ExtensionType::AuthorityInfoAccess(aia) => print!("{:?}", aia.access_descriptions()?),
                         e => {
                             let &c = dist.get(&s).unwrap_or(&0);

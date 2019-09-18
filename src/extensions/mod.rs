@@ -12,6 +12,7 @@ use crate::extensions::subject_alternative_names::SubjectAlternativeNames;
 use crate::extensions::authority_info_access::AuthorityInfoAccess;
 use crate::extensions::authority_key_identifier::AuthorityKeyIdentifier;
 use crate::extensions::subject_key_identifier::SubjectKeyIdentifier;
+use crate::extensions::extended_key_usage::ExtendedKeyUsage;
 
 const SUBJECT_KEY_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 14]);
 const KEY_USAGE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 15]);
@@ -19,6 +20,7 @@ const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifi
 const BASIC_CONSTRAINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 19]);
 const CRL_DISTRIBUTION_POINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 31]);
 const AUTHORITY_KEY_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 35]);
+const EXTENDED_KEY_USAGE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 37]);
 const AUTHORITY_INFO_ACCESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 1, 1]);
 
 
@@ -33,6 +35,7 @@ pub enum ExtensionType<'a> {
     BasicConstraints(BasicConstraints<'a>),
     CrlDistributionPoints(CrlDistributionPoints<'a>),
     AuthorityInfoAccess(AuthorityInfoAccess<'a>),
+    ExtendedKeyUsage(ExtendedKeyUsage<'a>),
     AuthorityKeyIdentifier(AuthorityKeyIdentifier<'a>),
     Unknown(&'a ObjectIdentifier<'a>, &'a [u8]),
 }
@@ -46,6 +49,7 @@ impl<'a> ExtensionType<'a> {
             BASIC_CONSTRAINTS_OID => Ok(ExtensionType::BasicConstraints(BasicConstraints::new(data)?)),
             CRL_DISTRIBUTION_POINTS_OID => Ok(ExtensionType::CrlDistributionPoints(CrlDistributionPoints::new(data)?)),
             AUTHORITY_KEY_IDENTIFIER_OID => Ok(ExtensionType::AuthorityKeyIdentifier(AuthorityKeyIdentifier::new(data)?)),
+            EXTENDED_KEY_USAGE_OID => Ok(ExtensionType::ExtendedKeyUsage(ExtendedKeyUsage::new(data)?)),
             AUTHORITY_INFO_ACCESS_OID => Ok(ExtensionType::AuthorityInfoAccess(AuthorityInfoAccess::new(data)?)),
             _ => Ok(ExtensionType::Unknown(oid, data)),
         }
@@ -106,7 +110,6 @@ impl<'a> GeneralName<'a> {
     }
 }
 
-
 mod key_usage;
 mod basic_constraints;
 mod crl_distribution_points;
@@ -114,3 +117,4 @@ mod subject_alternative_names;
 mod authority_info_access;
 mod authority_key_identifier;
 mod subject_key_identifier;
+mod extended_key_usage;
