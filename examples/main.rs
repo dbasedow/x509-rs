@@ -108,12 +108,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn check_self_signed_sig(cert: &Certificate) -> Result<bool, Error> {
     let alg: &dyn VerificationAlgorithm = match cert.signature_algorithm()? {
-        SignatureAlgorithm::Pkcs1Sha1Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA1,
-        SignatureAlgorithm::Pkcs1Sha256Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
-        SignatureAlgorithm::Pkcs1Sha384Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA384,
-        SignatureAlgorithm::Pkcs1Sha512Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA512,
-        SignatureAlgorithm::Pkcs1Sha256Ecdsa => &ring::signature::ECDSA_P256_SHA256_ASN1,
-        SignatureAlgorithm::Pkcs1Sha384Ecdsa => &ring::signature::ECDSA_P384_SHA384_FIXED,
+        SignatureAlgorithm::Sha1Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA1,
+        SignatureAlgorithm::Sha256Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+        SignatureAlgorithm::Sha384Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA384,
+        SignatureAlgorithm::Sha512Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA512,
+        SignatureAlgorithm::Sha256Ecdsa => &ring::signature::ECDSA_P256_SHA256_ASN1,
+        SignatureAlgorithm::Sha384Ecdsa => &ring::signature::ECDSA_P384_SHA384_FIXED,
         _ => return Err(Error::X509Error),
     };
 

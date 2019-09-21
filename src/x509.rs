@@ -46,6 +46,7 @@ const ECDSA_WITH_SHA512_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42
 const DSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[96, 134, 72, 1, 101, 3, 4, 3, 2]);
 const RSA_WITH_MD5_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 4]);
 
+/// A parsed X.509 certificate
 pub struct Certificate<'a>(Value<'a>);
 
 pub enum Version {
@@ -66,15 +67,15 @@ impl Display for Version {
 
 #[derive(Debug)]
 pub enum SignatureAlgorithm {
-    Pkcs1Sha1Rsa,
-    Pkcs1Sha256Rsa,
-    Pkcs1Sha384Rsa,
-    Pkcs1Sha512Rsa,
-    Pkcs1Sha256Ecdsa,
-    Pkcs1Sha384Ecdsa,
-    Pkcs1Sha512Ecdsa,
-    Pkcs1Sha256Dsa,
-    Pkcs1Md5Rsa,
+    Sha1Rsa,
+    Sha256Rsa,
+    Sha384Rsa,
+    Sha512Rsa,
+    Sha256Ecdsa,
+    Sha384Ecdsa,
+    Sha512Ecdsa,
+    Sha256Dsa,
+    Md5Rsa,
 }
 
 impl TryFrom<i64> for Version {
@@ -126,6 +127,8 @@ impl<'a> Certificate<'a> {
             (p, v) => unimplemented!("not implemented: ({:?}, {})", p, v),
         }
     }
+
+    /// Create a new instance from parsed DER
     pub fn from_value(value: Value<'a>) -> Certificate<'a> {
         Certificate(value)
     }
@@ -139,6 +142,7 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    /// Which version of X.509 is used
     pub fn version(&self) -> Result<Version, Error> {
         match self.version_no_default()? {
             Some(v) => Ok(v),
@@ -192,11 +196,13 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    /// Issuer of the certificate. Returns a number of relative distinguished names
     pub fn issuer(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
         let index = self.index_for(Part::Issuer)?;
         self.get_rdns_at_offset(index)
     }
 
+    /// Subject of the certificate. Returns a number of relative distinguished names
     pub fn subject(&self) -> Result<Vec<RelativeDistinguishedName>, Error> {
         let index = self.index_for(Part::Subject)?;
         self.get_rdns_at_offset(index)
@@ -231,6 +237,7 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    /// Returns the data used in the signature calculation. (TBS = to be signed)
     pub fn raw_tbs_cert(&self) -> Result<&[u8], Error> {
         if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::Sequence(_, raw) = &certificate[0] {
@@ -253,6 +260,7 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    /// The signature algorithm is stored in the signed and unsigned part of the certificate. Both MUST match!
     pub fn signature_algorithm_unsigned(&self) -> Result<SignatureAlgorithm, Error> {
         if let Value::Sequence(certificate, _) = &self.0 {
             if let Value::Sequence(algorithm_identifier, _) = &certificate[1] {
@@ -264,10 +272,16 @@ impl<'a> Certificate<'a> {
         Err(Error::X509Error)
     }
 
+    /// The signature algorithm is stored in the signed and unsigned part of the certificate. Both MUST match!
     pub fn signature_algorithm(&self) -> Result<SignatureAlgorithm, Error> {
         let tbs_cert = self.tbs_cert()?;
         let index = self.index_for(Part::Signature)?;
         if let Value::Sequence(algorithm_identifier, _) = &tbs_cert[index] {
+            if algorithm_identifier.len() > 1 {
+                if Value::Null != algorithm_identifier[1] {
+                    unimplemented!("algorithm params: {:x?}", algorithm_identifier[1]);
+                }
+            }
             if let Value::ObjectIdentifier(oid) = &algorithm_identifier[0] {
                 return Ok(lookup_algorithm_identifier(oid));
             }
@@ -323,16 +337,16 @@ impl<'a> Certificate<'a> {
 
 fn lookup_algorithm_identifier(oid: &ObjectIdentifier) -> SignatureAlgorithm {
     match oid {
-        SHA1_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha1Rsa,
-        SHA1_WITH_RSA_OBSOLETE_OID => SignatureAlgorithm::Pkcs1Sha1Rsa,
-        SHA256_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha256Rsa,
-        SHA384_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha384Rsa,
-        SHA512_WITH_RSA_OID => SignatureAlgorithm::Pkcs1Sha512Rsa,
-        ECDSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Ecdsa,
-        ECDSA_WITH_SHA384_OID => SignatureAlgorithm::Pkcs1Sha384Ecdsa,
-        ECDSA_WITH_SHA512_OID => SignatureAlgorithm::Pkcs1Sha512Ecdsa,
-        DSA_WITH_SHA256_OID => SignatureAlgorithm::Pkcs1Sha256Dsa,
-        RSA_WITH_MD5_OID => SignatureAlgorithm::Pkcs1Md5Rsa,
+        SHA1_WITH_RSA_OID => SignatureAlgorithm::Sha1Rsa,
+        SHA1_WITH_RSA_OBSOLETE_OID => SignatureAlgorithm::Sha1Rsa,
+        SHA256_WITH_RSA_OID => SignatureAlgorithm::Sha256Rsa,
+        SHA384_WITH_RSA_OID => SignatureAlgorithm::Sha384Rsa,
+        SHA512_WITH_RSA_OID => SignatureAlgorithm::Sha512Rsa,
+        ECDSA_WITH_SHA256_OID => SignatureAlgorithm::Sha256Ecdsa,
+        ECDSA_WITH_SHA384_OID => SignatureAlgorithm::Sha384Ecdsa,
+        ECDSA_WITH_SHA512_OID => SignatureAlgorithm::Sha512Ecdsa,
+        DSA_WITH_SHA256_OID => SignatureAlgorithm::Sha256Dsa,
+        RSA_WITH_MD5_OID => SignatureAlgorithm::Md5Rsa,
         o => unimplemented!("unknown oid: {}, ({:?})", o, o.0),
     }
 }

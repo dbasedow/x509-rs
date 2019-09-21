@@ -81,7 +81,6 @@ impl PolicyQualifierInfo {
                     (USER_NOTICE_POLICY_QUALIFIER_OID, v) => return Ok(PolicyQualifierInfo::UserNotice(UserNotice::new(v)?)),
                     (o, _) => unimplemented!("{}", o),
                 }
-                unimplemented!("{}", o);
             }
         }
         Err(Error::X509Error)
@@ -102,7 +101,7 @@ impl UserNotice {
                 return Err(Error::X509Error);
             }
             for v in seq {
-                if let Value::Sequence(s, _) = v {
+                if let Value::Sequence(_, _) = v {
                     result.notice_ref = Some(NoticeReference::new(v)?);
                 } else {
                     result.explicit_text = Some(display_string_to_string(v)?);

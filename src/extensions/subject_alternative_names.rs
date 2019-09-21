@@ -20,6 +20,5 @@ impl<'a> SubjectAlternativeNames<'a> {
             sans.push(GeneralName::new(&v)?);
         }
         return Ok(sans);
-        Err(Error::X509Error)
     }
 }
