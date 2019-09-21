@@ -13,19 +13,18 @@ use crate::extensions::authority_info_access::AuthorityInfoAccess;
 use crate::extensions::authority_key_identifier::AuthorityKeyIdentifier;
 use crate::extensions::subject_key_identifier::SubjectKeyIdentifier;
 use crate::extensions::extended_key_usage::ExtendedKeyUsage;
+use std::io::ErrorKind;
+use crate::extensions::certificate_policies::CertificatePolicies;
 
 const SUBJECT_KEY_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 14]);
 const KEY_USAGE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 15]);
 const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 17]);
 const BASIC_CONSTRAINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 19]);
 const CRL_DISTRIBUTION_POINTS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 31]);
+const CERTIFICATE_POLICIES_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 32]);
 const AUTHORITY_KEY_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 35]);
 const EXTENDED_KEY_USAGE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 37]);
 const AUTHORITY_INFO_ACCESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 1, 1]);
-
-
-const AUTHORITY_INFO_ACCESS_OCSP_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 48, 1]);
-const AUTHORITY_INFO_ACCESS_CA_ISSUERS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 48, 2]);
 
 #[derive(Debug)]
 pub enum ExtensionType<'a> {
@@ -34,6 +33,7 @@ pub enum ExtensionType<'a> {
     SubjectAlternativeNames(SubjectAlternativeNames<'a>),
     BasicConstraints(BasicConstraints<'a>),
     CrlDistributionPoints(CrlDistributionPoints<'a>),
+    CertificatePolicies(CertificatePolicies<'a>),
     AuthorityInfoAccess(AuthorityInfoAccess<'a>),
     ExtendedKeyUsage(ExtendedKeyUsage<'a>),
     AuthorityKeyIdentifier(AuthorityKeyIdentifier<'a>),
@@ -48,6 +48,7 @@ impl<'a> ExtensionType<'a> {
             SUBJECT_ALTERNATIVE_NAME_OID => Ok(ExtensionType::SubjectAlternativeNames(SubjectAlternativeNames::new(data)?)),
             BASIC_CONSTRAINTS_OID => Ok(ExtensionType::BasicConstraints(BasicConstraints::new(data)?)),
             CRL_DISTRIBUTION_POINTS_OID => Ok(ExtensionType::CrlDistributionPoints(CrlDistributionPoints::new(data)?)),
+            CERTIFICATE_POLICIES_OID => Ok(ExtensionType::CertificatePolicies(CertificatePolicies::new(data)?)),
             AUTHORITY_KEY_IDENTIFIER_OID => Ok(ExtensionType::AuthorityKeyIdentifier(AuthorityKeyIdentifier::new(data)?)),
             EXTENDED_KEY_USAGE_OID => Ok(ExtensionType::ExtendedKeyUsage(ExtendedKeyUsage::new(data)?)),
             AUTHORITY_INFO_ACCESS_OID => Ok(ExtensionType::AuthorityInfoAccess(AuthorityInfoAccess::new(data)?)),
@@ -110,6 +111,7 @@ impl<'a> GeneralName<'a> {
     }
 }
 
+
 mod key_usage;
 mod basic_constraints;
 mod crl_distribution_points;
@@ -118,3 +120,4 @@ mod authority_info_access;
 mod authority_key_identifier;
 mod subject_key_identifier;
 mod extended_key_usage;
+mod certificate_policies;

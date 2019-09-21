@@ -7,7 +7,6 @@ pub struct ExtendedKeyUsage<'a>(Vec<Value<'a>>);
 impl<'a> ExtendedKeyUsage<'a> {
     pub fn new(data: &'a [u8]) -> Result<ExtendedKeyUsage<'a>, Error> {
         if let (Value::Sequence(s, _), _) = parse_der(data)? {
-            println!("extended key usage {:?}", s);
             return Ok(ExtendedKeyUsage(s));
         }
 

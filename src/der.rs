@@ -228,6 +228,22 @@ impl<'a> Debug for Utf8String<'a> {
 }
 
 #[derive(PartialEq)]
+pub struct VisibleString<'a>(&'a [u8]);
+
+impl<'a> Display for VisibleString<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        let s = String::from_utf8_lossy(self.0);
+        write!(f, "{}", s)
+    }
+}
+
+impl<'a> Debug for VisibleString<'a> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
+        write!(f, "\"{}\"", self)
+    }
+}
+
+#[derive(PartialEq)]
 pub struct BMPString<'a>(&'a [u8]);
 
 impl<'a> Display for BMPString<'a> {
@@ -436,6 +452,7 @@ pub enum Value<'a> {
     UTCTime(UTCTime<'a>),
     GeneralizedTime(GeneralizedTime<'a>),
     PrintableString(PrintableString<'a>),
+    VisibleString(VisibleString<'a>),
     T61String(T61String<'a>),
     IA5String(IA5String<'a>),
     Utf8String(Utf8String<'a>),
@@ -453,6 +470,7 @@ impl<'a> Display for Value<'a> {
             Value::Utf8String(s) => write!(f, "{}", s),
             Value::OctetString(s) => write!(f, "{:?}", s),
             Value::PrintableString(s) => write!(f, "{}", s),
+            Value::VisibleString(s) => write!(f, "{}", s),
             Value::IA5String(s) => write!(f, "{}", s),
             Value::T61String(s) => write!(f, "{}", s),
             Value::BMPString(s) => write!(f, "{}", s),
@@ -543,6 +561,7 @@ pub fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x16 => Value::IA5String(IA5String(tlv.value)),
         0x17 => parse_utc_time(&tlv.value)?,
         0x18 => parse_generalized_time(&tlv.value)?,
+        0x1a => Value::VisibleString(VisibleString(tlv.value)),
         0x1e => Value::BMPString(BMPString(tlv.value)),
         t => {
             unimplemented!("{} is not implemented", t);

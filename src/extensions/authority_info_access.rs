@@ -1,5 +1,5 @@
 use crate::{Error, parse_der};
-use crate::der::Value;
+use crate::der::{Value, ObjectIdentifier};
 use crate::extensions::GeneralName;
 
 #[derive(Debug)]
@@ -28,6 +28,9 @@ pub enum AccessDescription<'a> {
     CaIssuers(GeneralName<'a>),
     Ocsp(GeneralName<'a>),
 }
+
+const AUTHORITY_INFO_ACCESS_OCSP_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 48, 1]);
+const AUTHORITY_INFO_ACCESS_CA_ISSUERS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 5, 5, 7, 48, 2]);
 
 impl<'a> AccessDescription<'a> {
     fn new(value: &'a Value<'a>) -> Result<AccessDescription<'a>, Error> {
