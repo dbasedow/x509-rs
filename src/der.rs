@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter, Debug};
 use chrono::prelude::*;
-use crate::error::Error;
+use crate::error::{Error, ParseError};
 use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Eq)]
@@ -188,7 +188,7 @@ impl<'a> IA5String<'a> {
         if let Ok(s) = String::from_utf8(self.0.to_vec()) {
             return Ok(s);
         }
-        Err(Error::ParseError)
+        Err(Error::ParseError(ParseError::StringEncoding))
     }
 }
 
@@ -317,7 +317,7 @@ fn ascii_to_digit(d: u8) -> Result<u32, Error> {
     if d >= 0x30 && d <= 0x39 {
         Ok((d & 0x0f) as u32)
     } else {
-        Err(Error::ParseError)
+        Err(Error::ParseError(ParseError::MalformedData))
     }
 }
 
@@ -422,7 +422,7 @@ impl<'a> BitString<'a> {
         // First Byte contains amount of padding in bits
         let len = (self.0.len() - 1) * 8 - self.0[0] as usize;
         if index + 1 > len {
-            return Err(Error::ParseError);
+            return Err(Error::IndexOutOfBoundsError);
         }
         // add one to byte offset, since first byte in the bit string is the padding size
         let byte_offset = index / 8 + 1;
@@ -474,14 +474,14 @@ impl<'a> Display for Value<'a> {
             Value::IA5String(s) => write!(f, "{}", s),
             Value::T61String(s) => write!(f, "{}", s),
             Value::BMPString(s) => write!(f, "{}", s),
-            v => unimplemented!("display not implemented {:?}", v),
+            v => write!(f, "display not implemented {:?}", v),
         }
     }
 }
 
 fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
     if data.len() < 1 {
-        return Err(Error::ParseError);
+        return Err(Error::ParseError(ParseError::MalformedData));
     }
 
 
@@ -530,7 +530,7 @@ fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
 
 fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
     if data.len() != 1 {
-        return Err(Error::ParseError);
+        return Err(Error::ParseError(ParseError::InvalidLength));
     }
     Ok(Value::Boolean(Boolean(data[0])))
 }
@@ -563,9 +563,7 @@ pub fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
         0x18 => parse_generalized_time(&tlv.value)?,
         0x1a => Value::VisibleString(VisibleString(tlv.value)),
         0x1e => Value::BMPString(BMPString(tlv.value)),
-        t => {
-            unimplemented!("{} is not implemented", t);
-        }
+        t => return Err(Error::ParseError(ParseError::UnsupportedTag(t))),
     };
     Ok((value, consumed))
 }
@@ -573,7 +571,6 @@ pub fn parse_der(data: &[u8]) -> Result<(Value, usize), Error> {
 
 struct TLV<'a> {
     tag: u8,
-    length: usize,
     value: &'a [u8],
 }
 
@@ -594,7 +591,7 @@ impl<'a> TLV<'a> {
 fn get_tlv(data: &[u8]) -> Result<(TLV, usize), Error> {
     if data.len() < 2 {
         // we need at least a tag and a length (which may be 0)
-        return Err(Error::ParseError);
+        return Err(Error::ParseError(ParseError::MalformedData));
     }
 
     let mut consumed: usize = 0;
@@ -612,7 +609,10 @@ fn get_tlv(data: &[u8]) -> Result<(TLV, usize), Error> {
     if long_length_encoding {
         let length_length = (first_length_octet & 0x7f) as usize;
         if length_length > 8 {
-            return Err(Error::ParseError);
+            return Err(Error::ParseError(ParseError::InvalidLength));
+        }
+        if length_length + 2 > data.len() {
+            return Err(Error::ParseError(ParseError::InvalidLength));
         }
         let mut tmp_length: usize = 0;
         for &octet in &data[2..2 + length_length] {
@@ -626,12 +626,11 @@ fn get_tlv(data: &[u8]) -> Result<(TLV, usize), Error> {
     }
 
     if length + consumed > data.len() {
-        return Err(Error::ParseError);
+        return Err(Error::ParseError(ParseError::InvalidLength));
     }
 
     Ok((TLV {
         tag,
-        length,
         value: &data[consumed..consumed + length],
     }, consumed + length))
 }
@@ -692,7 +691,6 @@ mod tests {
         let (tlv, consumed) = res.ok().unwrap();
         assert_eq!(consumed, 8);
         assert_eq!(tlv.tag, 0x06);
-        assert_eq!(tlv.length, 6);
         assert_eq!(hex::encode(tlv.value), "2a864886f70d");
     }
 

@@ -10,7 +10,7 @@ impl<'a> BasicConstraints<'a> {
             return Ok(BasicConstraints(s));
         }
 
-        Err(Error::ParseError)
+        Err(Error::X509Error)
     }
 
     pub fn is_ca(&self) -> Result<bool, Error> {

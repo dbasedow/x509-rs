@@ -5,8 +5,17 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum Error {
-    ParseError,
+    ParseError(ParseError),
     X509Error,
+    IndexOutOfBoundsError,
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    UnsupportedTag(u8),
+    MalformedData,
+    InvalidLength,
+    StringEncoding,
 }
 
 impl Display for Error {
@@ -17,13 +26,13 @@ impl Display for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(_: FromUtf8Error) -> Error {
-        Error::ParseError
+        Error::ParseError(ParseError::StringEncoding)
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(_: ParseIntError) -> Self {
-        Error::ParseError
+        Error::ParseError(ParseError::MalformedData)
     }
 }
 

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use ring::signature::VerificationAlgorithm;
 use x509::{der, Certificate, Error};
 use x509::extensions::ExtensionType;
-use x509::x509::SignatureAlgorithm;
+use x509::SignatureAlgorithm;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(file_name) = env::args().last() {

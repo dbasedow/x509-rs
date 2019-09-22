@@ -1,5 +1,5 @@
 use crate::der::{BitString, Value};
-use crate::error::Error;
+use crate::error::{Error, ParseError};
 use crate::parse_der;
 
 #[derive(Debug)]
@@ -11,7 +11,7 @@ impl<'a> KeyUsage<'a> {
             return Ok(KeyUsage(bs));
         }
 
-        Err(Error::ParseError)
+        Err(Error::ParseError(ParseError::MalformedData))
     }
 
     pub fn digital_signature(&self) -> Result<bool, Error> {
