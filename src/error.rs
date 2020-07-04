@@ -1,13 +1,14 @@
-use std::string::FromUtf8Error;
-use std::num::ParseIntError;
-use std::fmt::{Formatter, Display};
 use std::fmt;
+use std::fmt::{Display, Formatter};
+use std::num::ParseIntError;
+use std::string::FromUtf8Error;
 
 #[derive(Debug)]
 pub enum Error {
     ParseError(ParseError),
     X509Error,
     IndexOutOfBoundsError,
+    InvalidSignature,
 }
 
 #[derive(Debug)]

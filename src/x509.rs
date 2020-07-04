@@ -1,10 +1,12 @@
-use crate::der::{Value, ObjectIdentifier};
-use std::convert::{TryFrom, TryInto};
-use std::ops::Deref;
-use chrono::{DateTime, FixedOffset};
-use std::fmt::{self, Debug, Formatter, Display};
+use crate::der::{ObjectIdentifier, Value};
 use crate::error::Error;
 use crate::extensions::ExtensionType;
+use chrono::{DateTime, FixedOffset};
+use ring::signature::VerificationAlgorithm;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::Deref;
+use untrusted::Input;
 
 const COMMON_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 3]);
 const SURNAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 4]);
@@ -25,26 +27,44 @@ const INITIALS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 43])
 const HOUSE_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 51]);
 const ORGANIZATION_IDENTIFIER_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 4, 97]);
 
-const DUNS_BUSINESS_ID_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 132, 7, 1]);
-const LEGAL_ENTITY_ID_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 131, 152, 42, 1]);
+const DUNS_BUSINESS_ID_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 6, 1, 4, 1, 132, 7, 1]);
+const LEGAL_ENTITY_ID_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 6, 1, 4, 1, 131, 152, 42, 1]);
 const SUBJECT_ALTERNATIVE_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[85, 29, 17]);
-const UNSTRUCTURED_NAME_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 2]);
-const EMAIL_ADDRESS_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 1]);
-const JURISDICTION_OF_INCORPORATION_COUNTRY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 3]);
-const JURISDICTION_OF_INCORPORATION_STATE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 2]);
-const JURISDICTION_OF_INCORPORATION_LOCALITY_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 1]);
-const DOMAIN_COMPONENT_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[9, 146, 38, 137, 147, 242, 44, 100, 1, 25]);
+const UNSTRUCTURED_NAME_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 2]);
+const EMAIL_ADDRESS_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 9, 1]);
+const JURISDICTION_OF_INCORPORATION_COUNTRY_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 3]);
+const JURISDICTION_OF_INCORPORATION_STATE_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 2]);
+const JURISDICTION_OF_INCORPORATION_LOCALITY_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 6, 1, 4, 1, 130, 55, 60, 2, 1, 1]);
+const DOMAIN_COMPONENT_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[9, 146, 38, 137, 147, 242, 44, 100, 1, 25]);
 
-const SHA1_WITH_RSA_OBSOLETE_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[43, 14, 3, 2, 29]);
-const SHA1_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 5]);
-const SHA256_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 11]);
-const SHA384_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 12]);
-const SHA512_WITH_RSA_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 13]);
-const ECDSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 2]);
-const ECDSA_WITH_SHA384_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 3]);
-const ECDSA_WITH_SHA512_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 4]);
-const DSA_WITH_SHA256_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[96, 134, 72, 1, 101, 3, 4, 3, 2]);
-const RSA_WITH_MD5_OID: &ObjectIdentifier<'static> = &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 4]);
+const SHA1_WITH_RSA_OBSOLETE_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[43, 14, 3, 2, 29]);
+const SHA1_WITH_RSA_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 5]);
+const SHA256_WITH_RSA_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 11]);
+const SHA384_WITH_RSA_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 12]);
+const SHA512_WITH_RSA_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 13]);
+const ECDSA_WITH_SHA256_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 2]);
+const ECDSA_WITH_SHA384_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 3]);
+const ECDSA_WITH_SHA512_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 206, 61, 4, 3, 4]);
+const DSA_WITH_SHA256_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[96, 134, 72, 1, 101, 3, 4, 3, 2]);
+const RSA_WITH_MD5_OID: &ObjectIdentifier<'static> =
+    &ObjectIdentifier(&[42, 134, 72, 134, 247, 13, 1, 1, 4]);
 
 /// A parsed X.509 certificate
 pub struct Certificate<'a>(Value<'a>);
@@ -216,7 +236,9 @@ impl<'a> Certificate<'a> {
                 if let Value::Set(s) = e {
                     if let Value::Sequence(sub, _) = &s[0] {
                         if let Value::ObjectIdentifier(oid) = &sub[0] {
-                            if let Some(rdn) = RelativeDistinguishedName::from_oid_and_string(&oid, &sub[1]) {
+                            if let Some(rdn) =
+                                RelativeDistinguishedName::from_oid_and_string(&oid, &sub[1])
+                            {
                                 result.push(rdn);
                             }
                         }
@@ -300,13 +322,18 @@ impl<'a> Certificate<'a> {
                             if let Value::ObjectIdentifier(oid) = &ext[0] {
                                 if let Value::Boolean(critical) = &ext[1] {
                                     if let Value::OctetString(data) = &ext[2] {
-                                        let extension = Extension(oid.clone(), critical.to_bool(), data.clone());
+                                        let extension = Extension(
+                                            oid.clone(),
+                                            critical.to_bool(),
+                                            data.clone(),
+                                        );
                                         res.push(extension);
                                     }
                                 } else {
                                     let critical = false;
                                     if let Value::OctetString(data) = &ext[1] {
-                                        let extension = Extension(oid.clone(), critical, data.clone());
+                                        let extension =
+                                            Extension(oid.clone(), critical, data.clone());
                                         res.push(extension);
                                     }
                                 }
@@ -333,6 +360,26 @@ impl<'a> Certificate<'a> {
         }
         Ok(false)
     }
+
+    pub fn verify_signature(&self, msg: &[u8], signature: &[u8]) -> Result<(), Error> {
+        let alg: &dyn VerificationAlgorithm = match self.signature_algorithm()? {
+            SignatureAlgorithm::Sha1Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA1,
+            SignatureAlgorithm::Sha256Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+            SignatureAlgorithm::Sha384Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA384,
+            SignatureAlgorithm::Sha512Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA512,
+            SignatureAlgorithm::Sha256Ecdsa => &ring::signature::ECDSA_P256_SHA256_ASN1,
+            SignatureAlgorithm::Sha384Ecdsa => &ring::signature::ECDSA_P384_SHA384_FIXED,
+            _ => return Err(Error::X509Error),
+        };
+
+        ring::signature::verify(
+            alg,
+            Input::from(self.public_key()?),
+            Input::from(msg),
+            Input::from(signature),
+        )
+        .map_err(|_| Error::InvalidSignature)
+    }
 }
 
 fn lookup_algorithm_identifier(oid: &ObjectIdentifier) -> SignatureAlgorithm {
@@ -355,7 +402,11 @@ pub struct Extension<'a>(ObjectIdentifier<'a>, bool, &'a [u8]);
 
 impl<'a> Debug for Extension<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        write!(f, "Extension: {} critical: {} data: {:x?}", self.0, self.1, self.2)
+        write!(
+            f,
+            "Extension: {} critical: {} data: {:x?}",
+            self.0, self.1, self.2
+        )
     }
 }
 
@@ -410,7 +461,10 @@ pub enum RelativeDistinguishedName<'a> {
 }
 
 impl<'a> RelativeDistinguishedName<'a> {
-    pub fn from_oid_and_string(oid: &ObjectIdentifier, value: &'a Value) -> Option<RelativeDistinguishedName<'a>> {
+    pub fn from_oid_and_string(
+        oid: &ObjectIdentifier,
+        value: &'a Value,
+    ) -> Option<RelativeDistinguishedName<'a>> {
         match oid {
             COMMON_NAME_OID => Some(RelativeDistinguishedName::CommonName(value)),
             SURNAME_OID => Some(RelativeDistinguishedName::Surname(value)),
@@ -429,16 +483,26 @@ impl<'a> RelativeDistinguishedName<'a> {
             TELEPHONE_NUMBER_OID => Some(RelativeDistinguishedName::TelephoneNumber(value)),
             INITIALS_OID => Some(RelativeDistinguishedName::Initials(value)),
             HOUSE_IDENTIFIER_OID => Some(RelativeDistinguishedName::HouseIdentifier(value)),
-            ORGANIZATION_IDENTIFIER_OID => Some(RelativeDistinguishedName::OrganizationIdentifier(value)),
+            ORGANIZATION_IDENTIFIER_OID => {
+                Some(RelativeDistinguishedName::OrganizationIdentifier(value))
+            }
 
             DUNS_BUSINESS_ID_OID => Some(RelativeDistinguishedName::DunsBusinessId(value)),
             LEGAL_ENTITY_ID_OID => Some(RelativeDistinguishedName::LegalEntityId(value)),
-            SUBJECT_ALTERNATIVE_NAME_OID => Some(RelativeDistinguishedName::SubjectAlternativeName(value)),
+            SUBJECT_ALTERNATIVE_NAME_OID => {
+                Some(RelativeDistinguishedName::SubjectAlternativeName(value))
+            }
             UNSTRUCTURED_NAME_OID => Some(RelativeDistinguishedName::UnstructuredName(value)),
             EMAIL_ADDRESS_OID => Some(RelativeDistinguishedName::EmailAddress(value)),
-            JURISDICTION_OF_INCORPORATION_COUNTRY_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationCountry(value)),
-            JURISDICTION_OF_INCORPORATION_STATE_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationState(value)),
-            JURISDICTION_OF_INCORPORATION_LOCALITY_OID => Some(RelativeDistinguishedName::JurisdictionOfIncorporationLocality(value)),
+            JURISDICTION_OF_INCORPORATION_COUNTRY_OID => {
+                Some(RelativeDistinguishedName::JurisdictionOfIncorporationCountry(value))
+            }
+            JURISDICTION_OF_INCORPORATION_STATE_OID => Some(
+                RelativeDistinguishedName::JurisdictionOfIncorporationState(value),
+            ),
+            JURISDICTION_OF_INCORPORATION_LOCALITY_OID => {
+                Some(RelativeDistinguishedName::JurisdictionOfIncorporationLocality(value))
+            }
             DOMAIN_COMPONENT_OID => Some(RelativeDistinguishedName::DomainComponent(value)),
             s => {
                 eprintln!("object identifier {} not supported ({:?})", s, s.0);
@@ -478,7 +542,9 @@ impl<'a> Display for RelativeDistinguishedName<'a> {
             EmailAddress(e) => write!(f, "email={}", e),
             JurisdictionOfIncorporationCountry(c) => write!(f, "jurisdiction-of-inc-country={}", c),
             JurisdictionOfIncorporationState(c) => write!(f, "jurisdiction-of-inc-state={}", c),
-            JurisdictionOfIncorporationLocality(c) => write!(f, "jurisdiction-of-inc-locality={}", c),
+            JurisdictionOfIncorporationLocality(c) => {
+                write!(f, "jurisdiction-of-inc-locality={}", c)
+            }
             DomainComponent(dc) => write!(f, "DC={}", dc),
         }
     }
