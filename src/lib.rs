@@ -5,5 +5,5 @@ pub mod extensions;
 mod utils;
 
 pub use error::Error;
-pub use x509::*;
+pub use crate::x509::*;
 pub use der::parse_der;
