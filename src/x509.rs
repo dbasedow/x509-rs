@@ -361,7 +361,12 @@ impl<'a> Certificate<'a> {
         Ok(false)
     }
 
-    pub fn verify_signature(&self, algorithm: &dyn VerificationAlgorithm, msg: &[u8], signature: &[u8]) -> Result<(), Error> {
+    pub fn verify_signature(
+        &self,
+        algorithm: &dyn VerificationAlgorithm,
+        msg: &[u8],
+        signature: &[u8],
+    ) -> Result<(), Error> {
         ring::signature::verify(
             algorithm,
             Input::from(self.public_key()?),
@@ -369,6 +374,31 @@ impl<'a> Certificate<'a> {
             Input::from(signature),
         )
         .map_err(|_| Error::InvalidSignature)
+    }
+
+    pub fn check_self_signed(&self) -> Result<bool, Error> {
+        let alg: &dyn VerificationAlgorithm = match self.signature_algorithm()? {
+            SignatureAlgorithm::Sha1Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA1,
+            SignatureAlgorithm::Sha256Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+            SignatureAlgorithm::Sha384Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA384,
+            SignatureAlgorithm::Sha512Rsa => &ring::signature::RSA_PKCS1_2048_8192_SHA512,
+            SignatureAlgorithm::Sha256Ecdsa => &ring::signature::ECDSA_P256_SHA256_ASN1,
+            SignatureAlgorithm::Sha384Ecdsa => &ring::signature::ECDSA_P384_SHA384_FIXED,
+            _ => return Err(Error::X509Error),
+        };
+
+        let key = self.public_key()?;
+        let signature = self.signature()?;
+        let msg = self.raw_tbs_cert()?;
+
+        let res = ring::signature::verify(
+            alg,
+            Input::from(key),
+            Input::from(msg),
+            Input::from(signature),
+        );
+
+        Ok(res.is_ok())
     }
 }
 
