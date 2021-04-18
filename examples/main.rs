@@ -1,3 +1,4 @@
+/*
 use std::{env, io};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -129,3 +130,6 @@ fn check_self_signed_sig(cert: &Certificate) -> Result<bool, Error> {
 
     Ok(res.is_ok())
 }
+*/
+
+pub fn main() {}

@@ -17,6 +17,8 @@ pub enum ParseError {
     MalformedData,
     InvalidLength,
     StringEncoding,
+    UnexpectedTag(u8),
+    InvalidVersion,
 }
 
 impl Display for Error {
