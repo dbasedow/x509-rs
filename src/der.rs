@@ -1,5 +1,6 @@
 use crate::error::{Error, ParseError};
 use chrono::prelude::*;
+use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 
@@ -443,6 +444,9 @@ impl<'a> Debug for GeneralizedTime<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct OctetString<'a>(&'a [u8]);
+
+#[derive(Debug, PartialEq)]
 pub struct BitString<'a>(&'a [u8]);
 
 impl<'a> BitString<'a> {
@@ -466,170 +470,6 @@ impl<'a> BitString<'a> {
         (self.0[0], &self.0[1..])
     }
 }
-
-#[derive(Debug, PartialEq)]
-pub enum Value<'a> {
-    Boolean(Boolean),
-    Integer(Integer<'a>),
-    BitString(BitString<'a>),
-    OctetString(&'a [u8]),
-    Null,
-    ObjectIdentifier(ObjectIdentifier<'a>),
-    Sequence(Vec<Value<'a>>, &'a [u8]),
-    // sequence, and raw slice
-    UTCTime(UTCTime<'a>),
-    GeneralizedTime(GeneralizedTime<'a>),
-    PrintableString(PrintableString<'a>),
-    VisibleString(VisibleString<'a>),
-    T61String(T61String<'a>),
-    IA5String(IA5String<'a>),
-    Utf8String(Utf8String<'a>),
-    BMPString(BMPString<'a>),
-    Set(Vec<Value<'a>>),
-    ContextSpecific(u8, Box<Value<'a>>),
-    ContextSpecificRaw(u8, &'a [u8]),
-}
-
-impl<'a> Display for Value<'a> {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
-        match self {
-            Value::Boolean(b) => write!(f, "{:?}", b),
-            Value::Integer(b) => write!(f, "{:?}", b),
-            Value::Utf8String(s) => write!(f, "{}", s),
-            Value::OctetString(s) => write!(f, "{:?}", s),
-            Value::PrintableString(s) => write!(f, "{}", s),
-            Value::VisibleString(s) => write!(f, "{}", s),
-            Value::IA5String(s) => write!(f, "{}", s),
-            Value::T61String(s) => write!(f, "{}", s),
-            Value::BMPString(s) => write!(f, "{}", s),
-            v => write!(f, "display not implemented {:?}", v),
-        }
-    }
-}
-
-fn parse_object_identifier(data: &[u8]) -> Result<Value, Error> {
-    if data.len() < 1 {
-        return Err(Error::ParseError(ParseError::MalformedData));
-    }
-
-    Ok(Value::ObjectIdentifier(ObjectIdentifier(data)))
-}
-
-fn parse_integer(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::Integer(Integer(data)))
-}
-
-fn parse_utc_time(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::UTCTime(UTCTime(data)))
-}
-
-fn parse_generalized_time(data: &[u8]) -> Result<Value, Error> {
-    Ok(Value::GeneralizedTime(GeneralizedTime(data)))
-}
-
-fn parse_boolean(data: &[u8]) -> Result<Value, Error> {
-    if data.len() != 1 {
-        return Err(Error::ParseError(ParseError::InvalidLength));
-    }
-    Ok(Value::Boolean(Boolean(data[0])))
-}
-
-struct TLV<'a> {
-    tag: u8,
-    value: &'a [u8],
-}
-
-impl<'a> TLV<'a> {
-    fn get_data_type(&self) -> u8 {
-        self.tag & 0x1f
-    }
-
-    fn is_constructed_type(&self) -> bool {
-        self.tag & 0x20 == 0x20
-    }
-
-    fn is_context_specific(&self) -> bool {
-        self.tag & 0x80 == 0x80
-    }
-}
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use hex;
-
-    #[test]
-    fn test_ascii_slice_to_u32() {
-        let d: Vec<u8> = "12345".bytes().collect();
-        assert_eq!(12345, ascii_slice_to_u32(&d).unwrap());
-    }
-
-    #[test]
-    fn test_parse_object_identifier() {
-        let d = hex::decode("2a864886f70d").unwrap();
-        let res = parse_object_identifier(&d);
-        assert!(res.is_ok());
-        let oid = res.ok().unwrap();
-        if let Value::ObjectIdentifier(oid) = oid {
-            assert_eq!("1.2.840.113549", format!("{}", oid));
-        } else {
-            panic!("wrong type");
-        }
-    }
-
-    #[test]
-    fn test_parse_integer() {
-        let d: Vec<u8> = vec![0x80];
-        let res = parse_integer(&d);
-        assert!(res.is_ok());
-        assert_eq!(format!("{}", Value::Integer(Integer(&d))), "-128");
-
-        let d: Vec<u8> = vec![0xFF, 0x7F];
-        let res = parse_integer(&d);
-        assert!(res.is_ok());
-        assert_eq!(format!("{}", Value::Integer(Integer(&d))), "-129");
-
-        let d: Vec<u8> = vec![0x00, 0x80];
-        let res = parse_integer(&d);
-        assert!(res.is_ok());
-        assert_eq!(format!("{}", Value::Integer(Integer(&d))), "128");
-        assert_eq!(format!("{}", Integer(&d).to_big_int()), "128");
-
-        let d: Vec<u8> = vec![
-            0x00, 0xa9, 0x98, 0xea, 0x4e, 0xa1, 0xd9, 0x30, 0xf5, 0x64, 0x7f,
-        ];
-        let res = parse_integer(&d);
-        assert!(res.is_ok());
-        assert_eq!(
-            format!("{}", Integer(&d).to_big_int()),
-            "800900724314181152892031"
-        );
-    }
-
-    /*
-        #[test]
-        fn test_parse_der_object_id() {
-            let d = hex::decode("06062a864886f70d").unwrap();
-            let res = parse_der(&d);
-            assert!(res.is_ok());
-            if let (Value::ObjectIdentifier(value), _) = res.ok().unwrap() {
-                assert_eq!("1.2.840.113549", format!("{}", value));
-            } else {
-                panic!("wrong value type");
-            }
-        }
-    */
-    #[test]
-    fn test_encode_oid_part() {
-        let d = encode_oid_part(128);
-        assert_eq!(&[0x81, 0x00], &d[..]);
-        let d = encode_oid_part(311);
-        assert_eq!(&[0x82, 0x37], &d[..]);
-    }
-}
-*/
-// new api
-use std::convert::TryFrom;
 
 #[derive(Eq, PartialEq)]
 pub enum DataType {
@@ -759,6 +599,15 @@ pub fn expect_integer(data: &[u8]) -> Result<(&[u8], Integer), ParseError> {
     Ok((rest, Integer(value)))
 }
 
+pub fn expect_boolean(data: &[u8]) -> Result<(&[u8], Boolean), ParseError> {
+    let (rest, value) = expect_type(data, DataType::Boolean)?;
+    if value.len() != 1 {
+        return Err(ParseError::InvalidLength);
+    }
+
+    Ok((rest, Boolean(value[0])))
+}
+
 pub fn expect_generalized_time(data: &[u8]) -> Result<(&[u8], GeneralizedTime), ParseError> {
     let (rest, value) = expect_type(data, DataType::GeneralizedTime)?;
 
@@ -775,6 +624,12 @@ pub fn expect_bit_string(data: &[u8]) -> Result<(&[u8], BitString), ParseError> 
     let (rest, value) = expect_type(data, DataType::BitString)?;
 
     Ok((rest, BitString(value)))
+}
+
+pub fn expect_octet_string(data: &[u8]) -> Result<(&[u8], OctetString), ParseError> {
+    let (rest, value) = expect_type(data, DataType::OctetString)?;
+
+    Ok((rest, OctetString(value)))
 }
 
 pub fn expect_object_identifier(data: &[u8]) -> Result<(&[u8], ObjectIdentifier), ParseError> {

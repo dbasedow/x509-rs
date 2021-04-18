@@ -1,12 +1,5 @@
-use crate::{
-    der::{
-        expect_bit_string, expect_generalized_time, expect_integer, expect_object_identifier,
-        expect_sequence, expect_set, expect_utc_time, take_any, try_get_explicit, Any, BitString,
-        ExplicitTag, GeneralizedTime, Integer, ObjectIdentifier, UTCTime,
-    },
-    error::ParseError,
-};
-use std::collections::HashSet;
+use crate::{der::{Any, BitString, ExplicitTag, GeneralizedTime, Integer, ObjectIdentifier, OctetString, UTCTime, expect_bit_string, expect_boolean, expect_generalized_time, expect_integer, expect_object_identifier, expect_octet_string, expect_sequence, expect_set, expect_utc_time, take_any, try_get_explicit}, error::ParseError};
+use std::fmt;
 
 fn expect_empty(data: &[u8]) -> Result<(), ParseError> {
     if !data.is_empty() {
@@ -182,53 +175,122 @@ impl<'a> AttributeTypeAndValue<'a> {
         };
         Ok((rest, attribute_type_and_value))
     }
+
+    pub fn attribute_type(&self) -> &ObjectIdentifier<'a> {
+        &self.attribute_type
+    }
 }
 
-#[derive(Debug)]
 pub struct RelativeDistinguishedName<'a> {
-    key_value_pairs: HashSet<AttributeTypeAndValue<'a>>,
+    data: &'a [u8],
+}
+
+impl<'a> RelativeDistinguishedName<'a> {
+    pub fn iter(&self) -> RDNIter {
+        RDNIter {
+            pos: self.data,
+            failure: false,
+        }
+    }
+}
+
+impl<'a> fmt::Debug for RelativeDistinguishedName<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for attr in self.iter() {
+            if let Ok(attr) = attr {
+                write!(f, "{:?}", attr)?;
+            } else {
+                write!(f, "error in RDN")?;
+            }
+        }
+        writeln!(f, "")
+    }
+}
+
+pub struct RDNIter<'a> {
+    pos: &'a [u8],
+    failure: bool,
+}
+
+impl<'a> Iterator for RDNIter<'a> {
+    type Item = Result<AttributeTypeAndValue<'a>, ParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos.is_empty() {
+            return None;
+        }
+        if self.failure {
+            //this iterator is in error state, continue returning ParseError
+            return Some(Err(ParseError::MalformedData));
+        }
+        let result = AttributeTypeAndValue::parse(self.pos);
+        match result {
+            Ok((rest, attribute)) => {
+                self.pos = rest;
+                Some(Ok(attribute))
+            }
+            Err(e) => {
+                self.failure = true;
+                Some(Err(e))
+            }
+        }
+    }
 }
 
 impl<'a> RelativeDistinguishedName<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
-        let (rest, inner) = expect_set(data)?;
-        let mut key_value_pairs = HashSet::new();
-
-        loop {
-            let (inner, kv) = AttributeTypeAndValue::parse(inner)?;
-            key_value_pairs.insert(kv);
-            if inner.is_empty() {
-                break;
-            }
-        }
-        if key_value_pairs.len() == 0 {
-            // according to ASN.1 there has to be at least one element in the SET
-            return Err(ParseError::InvalidLength);
-        }
-        let rdns = RelativeDistinguishedName { key_value_pairs };
+        let (rest, data) = expect_set(data)?;
+        let rdns = RelativeDistinguishedName { data };
 
         Ok((rest, rdns))
     }
 }
 #[derive(Debug)]
 pub struct DistinguishedName<'a> {
-    rdns: Vec<RelativeDistinguishedName<'a>>,
+    data: &'a [u8],
 }
 
 impl<'a> DistinguishedName<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
-        let (rest, mut inner) = expect_sequence(data)?;
-        let mut rdns = Vec::new();
-        loop {
-            if inner.is_empty() {
-                break;
-            }
-            let (rest, rdn) = RelativeDistinguishedName::parse(inner)?;
-            inner = rest;
-            rdns.push(rdn);
+        let (rest, data) = expect_sequence(data)?;
+        Ok((rest, DistinguishedName { data }))
+    }
+
+    pub fn iter(&self) -> DNIter {
+        DNIter {
+            pos: self.data,
+            failure: false,
         }
-        let dn = DistinguishedName { rdns };
-        Ok((rest, dn))
+    }
+}
+
+pub struct DNIter<'a> {
+    pos: &'a [u8],
+    failure: bool,
+}
+
+impl<'a> Iterator for DNIter<'a> {
+    type Item = Result<RelativeDistinguishedName<'a>, ParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos.is_empty() {
+            return None;
+        }
+        if self.failure {
+            //this iterator is in error state, continue returning ParseError
+            return Some(Err(ParseError::MalformedData));
+        }
+        let result = RelativeDistinguishedName::parse(self.pos);
+        match result {
+            Ok((rest, attribute)) => {
+                self.pos = rest;
+                Some(Ok(attribute))
+            }
+            Err(e) => {
+                self.failure = true;
+                Some(Err(e))
+            }
+        }
     }
 }
 
@@ -322,10 +384,60 @@ impl<'a> Extensions<'a> {
     }
 }
 
-struct Extension<'a> {
+pub struct ExtensionsIter<'a> {
+    pos: &'a [u8],
+    failure: bool,
+}
+
+impl<'a> Iterator for ExtensionsIter<'a> {
+    type Item = Result<Extension<'a>, ParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos.is_empty() {
+            return None;
+        }
+        if self.failure {
+            //this iterator is in error state, continue returning ParseError
+            return Some(Err(ParseError::MalformedData));
+        }
+        let result = Extension::parse(self.pos);
+        match result {
+            Ok((rest, attribute)) => {
+                self.pos = rest;
+                Some(Ok(attribute))
+            }
+            Err(e) => {
+                self.failure = true;
+                Some(Err(e))
+            }
+        }
+    }
+}
+
+pub struct Extension<'a> {
     extension_id: ObjectIdentifier<'a>,
     critical: bool,
-    value: &'a [u8],
+    value: OctetString<'a>,
+}
+
+impl<'a> Extension<'a> {
+    fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
+        let (rest, data) = expect_sequence(data)?;
+        let (data, extension_id) = expect_object_identifier(data)?;
+        let (data, critical) = if let Ok((data, critical)) = expect_boolean(data) {
+            (data, critical.to_bool())
+        } else {
+            (data, false)
+        };
+        let (data, value) = expect_octet_string(data)?;
+        expect_empty(data)?;
+        let extension = Extension {
+            extension_id,
+            critical,
+            value,
+        };
+        Ok((rest, extension))
+    }
 }
 
 #[test]
