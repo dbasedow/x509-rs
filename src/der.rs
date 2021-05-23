@@ -11,35 +11,10 @@ pub struct Any<'a> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ObjectIdentifier<'a>(pub &'a [u8]);
+pub struct ObjectIdentifier(Vec<u8>);
 
-impl<'a> ObjectIdentifier<'a> {
-    pub fn to_parts(&self) -> Vec<u64> {
-        let mut res = Vec::new();
-        let data = self.0;
-        let y = data[0] % 40;
-        let x = (data[0] - y) / 40;
-
-        res.push(x as u64);
-        res.push(y as u64);
-
-        let mut sub_id: u64 = 0;
-
-        for &octet in &data[1..] {
-            sub_id = sub_id << 7;
-            sub_id += (octet & 0x7f) as u64;
-
-            if octet & 0x80 == 0 {
-                //last part of subid.
-                res.push(sub_id);
-                sub_id = 0;
-            }
-        }
-
-        res
-    }
-
-    pub fn from_str(s: &str) -> Result<Vec<u8>, ()> {
+impl ObjectIdentifier {
+    pub fn from_str(s: &str) -> Result<Self, ()> {
         let parts: Vec<&str> = s.split('.').collect();
         if parts.len() < 2 {
             return Err(());
@@ -67,7 +42,7 @@ impl<'a> ObjectIdentifier<'a> {
                 data.extend_from_slice(&encode_oid_part(part));
             }
         }
-        Ok(data)
+        Ok(Self(data))
     }
 }
 
@@ -89,7 +64,43 @@ fn encode_oid_part(n: u64) -> Vec<u8> {
     res
 }
 
-impl<'a> Display for ObjectIdentifier<'a> {
+impl<'a> From<&'a ObjectIdentifier> for ObjectIdentifierRef<'a> {
+    fn from(oid: &'a ObjectIdentifier) -> Self {
+        Self(&oid.0)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ObjectIdentifierRef<'a>(&'a [u8]);
+
+impl<'a> ObjectIdentifierRef<'a> {
+    pub fn to_parts(&self) -> Vec<u64> {
+        let mut res = Vec::new();
+        let data = self.0;
+        let y = data[0] % 40;
+        let x = (data[0] - y) / 40;
+
+        res.push(x as u64);
+        res.push(y as u64);
+
+        let mut sub_id: u64 = 0;
+
+        for &octet in &data[1..] {
+            sub_id = sub_id << 7;
+            sub_id += (octet & 0x7f) as u64;
+
+            if octet & 0x80 == 0 {
+                //last part of subid.
+                res.push(sub_id);
+                sub_id = 0;
+            }
+        }
+
+        res
+    }
+}
+
+impl<'a> Display for ObjectIdentifierRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         for (index, &sub_id) in self.to_parts().iter().enumerate() {
             if index > 0 {
@@ -101,7 +112,7 @@ impl<'a> Display for ObjectIdentifier<'a> {
     }
 }
 
-impl<'a> Debug for ObjectIdentifier<'a> {
+impl<'a> Debug for ObjectIdentifierRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", self)
     }
@@ -478,7 +489,7 @@ pub enum DataType {
     BitString,
     OctetString,
     Null,
-    ObjectIdentifier,
+    ObjectIdentifierRef,
     Utf8String,
     Sequence,
     Set,
@@ -508,7 +519,7 @@ impl TryFrom<u8> for DataType {
             (0x03, _) => Ok(DataType::BitString),
             (0x04, _) => Ok(DataType::OctetString),
             (0x05, false) => Ok(DataType::Null),
-            (0x06, false) => Ok(DataType::ObjectIdentifier),
+            (0x06, false) => Ok(DataType::ObjectIdentifierRef),
             (0x0c, _) => Ok(DataType::Utf8String),
             (0x10, true) => Ok(DataType::Sequence),
             (0x11, true) => Ok(DataType::Set),
@@ -632,10 +643,10 @@ pub fn expect_octet_string(data: &[u8]) -> Result<(&[u8], OctetString), ParseErr
     Ok((rest, OctetString(value)))
 }
 
-pub fn expect_object_identifier(data: &[u8]) -> Result<(&[u8], ObjectIdentifier), ParseError> {
-    let (rest, inner) = expect_type(data, DataType::ObjectIdentifier)?;
+pub fn expect_object_identifier(data: &[u8]) -> Result<(&[u8], ObjectIdentifierRef), ParseError> {
+    let (rest, inner) = expect_type(data, DataType::ObjectIdentifierRef)?;
 
-    Ok((rest, ObjectIdentifier(inner)))
+    Ok((rest, ObjectIdentifierRef(inner)))
 }
 
 pub fn take_any(data: &[u8]) -> Result<(&[u8], Any), ParseError> {

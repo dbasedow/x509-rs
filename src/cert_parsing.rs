@@ -1,4 +1,12 @@
-use crate::{der::{Any, BitString, ExplicitTag, GeneralizedTime, Integer, ObjectIdentifier, OctetString, UTCTime, expect_bit_string, expect_boolean, expect_generalized_time, expect_integer, expect_object_identifier, expect_octet_string, expect_sequence, expect_set, expect_utc_time, take_any, try_get_explicit}, error::ParseError};
+use crate::{
+    der::{
+        expect_bit_string, expect_boolean, expect_generalized_time, expect_integer,
+        expect_object_identifier, expect_octet_string, expect_sequence, expect_set,
+        expect_utc_time, take_any, try_get_explicit, Any, BitString, ExplicitTag, GeneralizedTime,
+        Integer, ObjectIdentifierRef, OctetString, UTCTime,
+    },
+    error::ParseError,
+};
 use std::fmt;
 
 fn expect_empty(data: &[u8]) -> Result<(), ParseError> {
@@ -139,7 +147,7 @@ fn parse_subject_unique_id<'a>(
 
 #[derive(Debug)]
 pub struct AlgorithmidentifierRef<'a> {
-    algorithm_identifier: ObjectIdentifier<'a>,
+    algorithm_identifier: ObjectIdentifierRef<'a>,
     parameters: Any<'a>,
 }
 
@@ -159,7 +167,7 @@ fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], Algorithmidentifier
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AttributeTypeAndValueRef<'a> {
-    attribute_type: ObjectIdentifier<'a>,
+    attribute_type: ObjectIdentifierRef<'a>,
     value: Any<'a>,
 }
 
@@ -176,7 +184,7 @@ impl<'a> AttributeTypeAndValueRef<'a> {
         Ok((rest, attribute_type_and_value))
     }
 
-    pub fn attribute_type(&self) -> &ObjectIdentifier<'a> {
+    pub fn attribute_type(&self) -> &ObjectIdentifierRef<'a> {
         &self.attribute_type
     }
 }
@@ -415,7 +423,7 @@ impl<'a> Iterator for ExtensionsIter<'a> {
 }
 
 pub struct ExtensionRef<'a> {
-    extension_id: ObjectIdentifier<'a>,
+    extension_id: ObjectIdentifierRef<'a>,
     critical: bool,
     value: OctetString<'a>,
 }
