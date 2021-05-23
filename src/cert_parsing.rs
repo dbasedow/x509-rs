@@ -28,27 +28,27 @@ impl Version {
 }
 
 #[derive(Debug)]
-pub struct TBSCertificate<'a> {
+pub struct TBSCertificateRef<'a> {
     version: Version,
     serial_number: Integer<'a>,
-    algorithm_identifier: Algorithmidentifier<'a>,
+    algorithm_identifier: AlgorithmidentifierRef<'a>,
     issuer: Name<'a>,
-    validity: Validity<'a>,
+    validity: ValidityRef<'a>,
     subject: Name<'a>,
-    subject_public_key_info: SubjectPublicKeyInfo<'a>,
+    subject_public_key_info: SubjectPublicKeyInfoRef<'a>,
     issuer_unique_id: Option<BitString<'a>>,
     subject_unique_id: Option<BitString<'a>>,
-    extensions: Option<Extensions<'a>>,
+    extensions: Option<ExtensionsRef<'a>>,
 }
 
 #[derive(Debug)]
-pub struct Certificate<'a> {
-    tbs_cert: TBSCertificate<'a>,
-    signature_algorithm: Algorithmidentifier<'a>,
+pub struct CertificateRef<'a> {
+    tbs_cert: TBSCertificateRef<'a>,
+    signature_algorithm: AlgorithmidentifierRef<'a>,
     signature: BitString<'a>,
 }
 
-impl<'a> Certificate<'a> {
+impl<'a> CertificateRef<'a> {
     pub fn from_slice(data: &'a [u8]) -> Result<Self, ParseError> {
         let (left, root) = expect_sequence(data)?;
         // the root sequence should take up all the space in the buffer
@@ -60,7 +60,7 @@ impl<'a> Certificate<'a> {
         let (data, signature) = expect_bit_string(data)?;
         expect_empty(data)?;
 
-        let cert = Certificate {
+        let cert = Self {
             tbs_cert,
             signature_algorithm,
             signature,
@@ -70,20 +70,20 @@ impl<'a> Certificate<'a> {
     }
 }
 
-fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificate<'a>, ParseError> {
+fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
     let (data, version) = parse_version(data)?;
     let (data, serial_number) = expect_integer(data)?;
     let (data, algorithm_identifier) = parse_algorithm_identifier(data)?;
     let (data, issuer) = Name::parse(data)?;
-    let (data, validity) = Validity::parse(data)?;
+    let (data, validity) = ValidityRef::parse(data)?;
     let (data, subject) = Name::parse(data)?;
-    let (data, subject_public_key_info) = SubjectPublicKeyInfo::parse(data)?;
+    let (data, subject_public_key_info) = SubjectPublicKeyInfoRef::parse(data)?;
     let (data, issuer_unique_id) = parse_issuer_unique_id(data)?;
     let (data, subject_unique_id) = parse_subject_unique_id(data)?;
-    let (data, extensions) = Extensions::parse(data)?;
+    let (data, extensions) = ExtensionsRef::parse(data)?;
     expect_empty(data)?;
 
-    let tbs = TBSCertificate {
+    let tbs = TBSCertificateRef {
         version,
         serial_number,
         algorithm_identifier,
@@ -138,19 +138,19 @@ fn parse_subject_unique_id<'a>(
 }
 
 #[derive(Debug)]
-pub struct Algorithmidentifier<'a> {
+pub struct AlgorithmidentifierRef<'a> {
     algorithm_identifier: ObjectIdentifier<'a>,
     parameters: Any<'a>,
 }
 
-fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], Algorithmidentifier), ParseError> {
+fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], AlgorithmidentifierRef), ParseError> {
     let (rest, inner) = expect_sequence(data)?;
     let (inner, algorithm_identifier) = expect_object_identifier(inner)?;
     let (inner, parameters) = take_any(inner)?;
     expect_empty(inner)?;
     Ok((
         rest,
-        Algorithmidentifier {
+        AlgorithmidentifierRef {
             algorithm_identifier,
             parameters,
         },
@@ -158,18 +158,18 @@ fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], Algorithmidentifier
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct AttributeTypeAndValue<'a> {
+pub struct AttributeTypeAndValueRef<'a> {
     attribute_type: ObjectIdentifier<'a>,
     value: Any<'a>,
 }
 
-impl<'a> AttributeTypeAndValue<'a> {
+impl<'a> AttributeTypeAndValueRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, inner) = expect_sequence(data)?;
         let (inner, attribute_type) = expect_object_identifier(inner)?;
         let (inner, value) = take_any(inner)?;
         expect_empty(inner)?;
-        let attribute_type_and_value = AttributeTypeAndValue {
+        let attribute_type_and_value = Self {
             attribute_type,
             value,
         };
@@ -181,11 +181,11 @@ impl<'a> AttributeTypeAndValue<'a> {
     }
 }
 
-pub struct RelativeDistinguishedName<'a> {
+pub struct RelativeDistinguishedNameRef<'a> {
     data: &'a [u8],
 }
 
-impl<'a> RelativeDistinguishedName<'a> {
+impl<'a> RelativeDistinguishedNameRef<'a> {
     pub fn iter(&self) -> RDNIter {
         RDNIter {
             pos: self.data,
@@ -194,7 +194,7 @@ impl<'a> RelativeDistinguishedName<'a> {
     }
 }
 
-impl<'a> fmt::Debug for RelativeDistinguishedName<'a> {
+impl<'a> fmt::Debug for RelativeDistinguishedNameRef<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for attr in self.iter() {
             if let Ok(attr) = attr {
@@ -213,7 +213,7 @@ pub struct RDNIter<'a> {
 }
 
 impl<'a> Iterator for RDNIter<'a> {
-    type Item = Result<AttributeTypeAndValue<'a>, ParseError>;
+    type Item = Result<AttributeTypeAndValueRef<'a>, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos.is_empty() {
@@ -223,7 +223,7 @@ impl<'a> Iterator for RDNIter<'a> {
             //this iterator is in error state, continue returning ParseError
             return Some(Err(ParseError::MalformedData));
         }
-        let result = AttributeTypeAndValue::parse(self.pos);
+        let result = AttributeTypeAndValueRef::parse(self.pos);
         match result {
             Ok((rest, attribute)) => {
                 self.pos = rest;
@@ -237,23 +237,23 @@ impl<'a> Iterator for RDNIter<'a> {
     }
 }
 
-impl<'a> RelativeDistinguishedName<'a> {
+impl<'a> RelativeDistinguishedNameRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, data) = expect_set(data)?;
-        let rdns = RelativeDistinguishedName { data };
+        let rdns = RelativeDistinguishedNameRef { data };
 
         Ok((rest, rdns))
     }
 }
 #[derive(Debug)]
-pub struct DistinguishedName<'a> {
+pub struct DistinguishedNameRef<'a> {
     data: &'a [u8],
 }
 
-impl<'a> DistinguishedName<'a> {
+impl<'a> DistinguishedNameRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, data) = expect_sequence(data)?;
-        Ok((rest, DistinguishedName { data }))
+        Ok((rest, Self { data }))
     }
 
     pub fn iter(&self) -> DNIter {
@@ -270,7 +270,7 @@ pub struct DNIter<'a> {
 }
 
 impl<'a> Iterator for DNIter<'a> {
-    type Item = Result<RelativeDistinguishedName<'a>, ParseError>;
+    type Item = Result<RelativeDistinguishedNameRef<'a>, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos.is_empty() {
@@ -280,7 +280,7 @@ impl<'a> Iterator for DNIter<'a> {
             //this iterator is in error state, continue returning ParseError
             return Some(Err(ParseError::MalformedData));
         }
-        let result = RelativeDistinguishedName::parse(self.pos);
+        let result = RelativeDistinguishedNameRef::parse(self.pos);
         match result {
             Ok((rest, attribute)) => {
                 self.pos = rest;
@@ -296,30 +296,30 @@ impl<'a> Iterator for DNIter<'a> {
 
 #[derive(Debug)]
 enum Name<'a> {
-    DistinguishedName(DistinguishedName<'a>),
+    DistinguishedNameRef(DistinguishedNameRef<'a>),
 }
 
 impl<'a> Name<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         // right now there is only one CHOICE
-        let (rest, dn) = DistinguishedName::parse(data)?;
-        Ok((rest, Self::DistinguishedName(dn)))
+        let (rest, dn) = DistinguishedNameRef::parse(data)?;
+        Ok((rest, Self::DistinguishedNameRef(dn)))
     }
 }
 
 #[derive(Debug)]
-enum Time<'a> {
+enum TimeRef<'a> {
     UTCTime(UTCTime<'a>),
     GeneralizedTime(GeneralizedTime<'a>),
 }
 
-impl<'a> Time<'a> {
+impl<'a> TimeRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         if let Ok((rest, utc)) = expect_utc_time(data) {
-            return Ok((rest, Time::UTCTime(utc)));
+            return Ok((rest, Self::UTCTime(utc)));
         }
         if let Ok((rest, generalized)) = expect_generalized_time(data) {
-            return Ok((rest, Time::GeneralizedTime(generalized)));
+            return Ok((rest, Self::GeneralizedTime(generalized)));
         }
 
         Err(ParseError::MalformedData)
@@ -327,18 +327,18 @@ impl<'a> Time<'a> {
 }
 
 #[derive(Debug)]
-pub struct Validity<'a> {
-    not_before: Time<'a>,
-    not_after: Time<'a>,
+pub struct ValidityRef<'a> {
+    not_before: TimeRef<'a>,
+    not_after: TimeRef<'a>,
 }
 
-impl<'a> Validity<'a> {
+impl<'a> ValidityRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, data) = expect_sequence(data)?;
-        let (data, not_before) = Time::parse(data)?;
-        let (data, not_after) = Time::parse(data)?;
+        let (data, not_before) = TimeRef::parse(data)?;
+        let (data, not_after) = TimeRef::parse(data)?;
         expect_empty(data)?;
-        let validity = Validity {
+        let validity = Self {
             not_after,
             not_before,
         };
@@ -348,18 +348,18 @@ impl<'a> Validity<'a> {
 }
 
 #[derive(Debug)]
-struct SubjectPublicKeyInfo<'a> {
-    algorithm: Algorithmidentifier<'a>,
+struct SubjectPublicKeyInfoRef<'a> {
+    algorithm: AlgorithmidentifierRef<'a>,
     subject_public_key: BitString<'a>,
 }
 
-impl<'a> SubjectPublicKeyInfo<'a> {
+impl<'a> SubjectPublicKeyInfoRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, data) = expect_sequence(data)?;
         let (data, algorithm) = parse_algorithm_identifier(data)?;
         let (data, subject_public_key) = expect_bit_string(data)?;
         expect_empty(data)?;
-        let spki = SubjectPublicKeyInfo {
+        let spki = Self {
             algorithm,
             subject_public_key,
         };
@@ -369,9 +369,9 @@ impl<'a> SubjectPublicKeyInfo<'a> {
 }
 
 #[derive(Debug)]
-pub struct Extensions<'a>(&'a [u8]);
+pub struct ExtensionsRef<'a>(&'a [u8]);
 
-impl<'a> Extensions<'a> {
+impl<'a> ExtensionsRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Option<Self>), ParseError> {
         match try_get_explicit(data, ExplicitTag::try_new(3)?) {
             Ok((rest, inner)) => {
@@ -390,7 +390,7 @@ pub struct ExtensionsIter<'a> {
 }
 
 impl<'a> Iterator for ExtensionsIter<'a> {
-    type Item = Result<Extension<'a>, ParseError>;
+    type Item = Result<ExtensionRef<'a>, ParseError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos.is_empty() {
@@ -400,7 +400,7 @@ impl<'a> Iterator for ExtensionsIter<'a> {
             //this iterator is in error state, continue returning ParseError
             return Some(Err(ParseError::MalformedData));
         }
-        let result = Extension::parse(self.pos);
+        let result = ExtensionRef::parse(self.pos);
         match result {
             Ok((rest, attribute)) => {
                 self.pos = rest;
@@ -414,13 +414,13 @@ impl<'a> Iterator for ExtensionsIter<'a> {
     }
 }
 
-pub struct Extension<'a> {
+pub struct ExtensionRef<'a> {
     extension_id: ObjectIdentifier<'a>,
     critical: bool,
     value: OctetString<'a>,
 }
 
-impl<'a> Extension<'a> {
+impl<'a> ExtensionRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         let (rest, data) = expect_sequence(data)?;
         let (data, extension_id) = expect_object_identifier(data)?;
@@ -431,7 +431,7 @@ impl<'a> Extension<'a> {
         };
         let (data, value) = expect_octet_string(data)?;
         expect_empty(data)?;
-        let extension = Extension {
+        let extension = Self {
             extension_id,
             critical,
             value,
@@ -445,7 +445,7 @@ fn test_cert() {
     use core::str::FromStr;
 
     let data = include_bytes!("../certs/test.crt");
-    let r = Certificate::from_slice(data);
+    let r = CertificateRef::from_slice(data);
     assert!(r.is_ok());
     let cert = r.unwrap();
     assert_eq!(cert.tbs_cert.version, Version::V3);

@@ -7,4 +7,4 @@ mod utils;
 
 pub use error::Error;
 //pub use crate::x509::*;
-pub use cert_parsing::{Certificate};
+pub use cert_parsing::{CertificateRef};
