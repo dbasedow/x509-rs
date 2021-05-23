@@ -115,7 +115,7 @@ impl<'a> Debug for ObjectIdentifierRef<'a> {
 
 
 pub fn expect_object_identifier(data: &[u8]) -> Result<(&[u8], ObjectIdentifierRef), ParseError> {
-    let (rest, inner) = expect_type(data, DataType::ObjectIdentifierRef)?;
+    let (rest, inner) = expect_type(data, DataType::ObjectIdentifier)?;
 
     Ok((rest, ObjectIdentifierRef(inner)))
 }
