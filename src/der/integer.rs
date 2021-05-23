@@ -4,9 +4,9 @@ use std::fmt::{self, Debug, Formatter};
 use super::{expect_type, DataType};
 
 #[derive(PartialEq)]
-pub struct Integer<'a>(&'a [u8]);
+pub struct IntegerRef<'a>(&'a [u8]);
 
-impl<'a> Integer<'a> {
+impl<'a> IntegerRef<'a> {
     pub fn to_i64(&self) -> Result<i64, ParseError> {
         let data = self.0;
         if data.len() > 8 {
@@ -30,15 +30,15 @@ impl<'a> Integer<'a> {
     }
 }
 
-impl<'a> Debug for Integer<'a> {
+impl<'a> Debug for IntegerRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         let i = self.to_i64();
         write!(f, "{:#?}", i)
     }
 }
 
-pub fn expect_integer(data: &[u8]) -> Result<(&[u8], Integer), ParseError> {
+pub fn expect_integer(data: &[u8]) -> Result<(&[u8], IntegerRef), ParseError> {
     let (rest, value) = expect_type(data, DataType::Integer)?;
 
-    Ok((rest, Integer(value)))
+    Ok((rest, IntegerRef(value)))
 }

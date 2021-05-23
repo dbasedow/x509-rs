@@ -218,20 +218,20 @@ mod tests {
     }
 }
 
-pub use any::{take_any, Any};
-pub use bit_string::{expect_bit_string, BitString};
-pub use bmp_string::BMPString;
+pub use any::{take_any, AnyRef};
+pub use bit_string::{expect_bit_string, BitStringRef};
+pub use bmp_string::BMPStringRef;
 pub use boolean::{expect_boolean, Boolean};
-pub use generalized_time::{expect_generalized_time, GeneralizedTime};
-pub use ia5_string::IA5String;
-pub use integer::{expect_integer, Integer};
+pub use generalized_time::{expect_generalized_time, GeneralizedTimeRef};
+pub use ia5_string::IA5StringRef;
+pub use integer::{expect_integer, IntegerRef};
 pub use object_identifier::{expect_object_identifier, ObjectIdentifier, ObjectIdentifierRef};
-pub use octet_string::{expect_octet_string, OctetString};
-pub use printable_string::PrintableString;
-pub use t61_string::T61String;
-pub use utc_time::{expect_utc_time, UTCTime};
-pub use utf8_string::Utf8String;
-pub use visible_string::VisibleString;
+pub use octet_string::{expect_octet_string, OctetStringRef};
+pub use printable_string::PrintableStringRef;
+pub use t61_string::T61StringRef;
+pub use utc_time::{expect_utc_time, UTCTimeRef};
+pub use utf8_string::Utf8StringRef;
+pub use visible_string::VisibleStringRef;
 
 mod any;
 mod bit_string;

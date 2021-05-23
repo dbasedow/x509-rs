@@ -4,9 +4,9 @@ use super::{DataType, expect_type};
 
 
 #[derive(Debug, PartialEq)]
-pub struct BitString<'a>(&'a [u8]);
+pub struct BitStringRef<'a>(&'a [u8]);
 
-impl<'a> BitString<'a> {
+impl<'a> BitStringRef<'a> {
     pub fn bit_at(&self, index: usize) -> Result<bool, Error> {
         // First Byte contains amount of padding in bits
         let len = (self.0.len() - 1) * 8 - self.0[0] as usize;
@@ -29,8 +29,8 @@ impl<'a> BitString<'a> {
 }
 
 
-pub fn expect_bit_string(data: &[u8]) -> Result<(&[u8], BitString), ParseError> {
+pub fn expect_bit_string(data: &[u8]) -> Result<(&[u8], BitStringRef), ParseError> {
     let (rest, value) = expect_type(data, DataType::BitString)?;
 
-    Ok((rest, BitString(value)))
+    Ok((rest, BitStringRef(value)))
 }

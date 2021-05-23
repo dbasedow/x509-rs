@@ -2,8 +2,8 @@ use crate::{
     der::{
         expect_bit_string, expect_boolean, expect_generalized_time, expect_integer,
         expect_object_identifier, expect_octet_string, expect_sequence, expect_set,
-        expect_utc_time, take_any, try_get_explicit, Any, BitString, ExplicitTag, GeneralizedTime,
-        Integer, ObjectIdentifierRef, OctetString, UTCTime,
+        expect_utc_time, take_any, try_get_explicit, AnyRef, BitStringRef, ExplicitTag, GeneralizedTimeRef,
+        IntegerRef, ObjectIdentifierRef, OctetStringRef, UTCTimeRef,
     },
     error::ParseError,
 };
@@ -38,14 +38,14 @@ impl Version {
 #[derive(Debug)]
 pub struct TBSCertificateRef<'a> {
     version: Version,
-    serial_number: Integer<'a>,
+    serial_number: IntegerRef<'a>,
     algorithm_identifier: AlgorithmidentifierRef<'a>,
-    issuer: Name<'a>,
+    issuer: NameRef<'a>,
     validity: ValidityRef<'a>,
-    subject: Name<'a>,
+    subject: NameRef<'a>,
     subject_public_key_info: SubjectPublicKeyInfoRef<'a>,
-    issuer_unique_id: Option<BitString<'a>>,
-    subject_unique_id: Option<BitString<'a>>,
+    issuer_unique_id: Option<BitStringRef<'a>>,
+    subject_unique_id: Option<BitStringRef<'a>>,
     extensions: Option<ExtensionsRef<'a>>,
 }
 
@@ -53,7 +53,7 @@ pub struct TBSCertificateRef<'a> {
 pub struct CertificateRef<'a> {
     tbs_cert: TBSCertificateRef<'a>,
     signature_algorithm: AlgorithmidentifierRef<'a>,
-    signature: BitString<'a>,
+    signature: BitStringRef<'a>,
 }
 
 impl<'a> CertificateRef<'a> {
@@ -82,9 +82,9 @@ fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
     let (data, version) = parse_version(data)?;
     let (data, serial_number) = expect_integer(data)?;
     let (data, algorithm_identifier) = parse_algorithm_identifier(data)?;
-    let (data, issuer) = Name::parse(data)?;
+    let (data, issuer) = NameRef::parse(data)?;
     let (data, validity) = ValidityRef::parse(data)?;
-    let (data, subject) = Name::parse(data)?;
+    let (data, subject) = NameRef::parse(data)?;
     let (data, subject_public_key_info) = SubjectPublicKeyInfoRef::parse(data)?;
     let (data, issuer_unique_id) = parse_issuer_unique_id(data)?;
     let (data, subject_unique_id) = parse_subject_unique_id(data)?;
@@ -121,7 +121,7 @@ fn parse_version(data: &[u8]) -> Result<(&[u8], Version), ParseError> {
 
 fn parse_issuer_unique_id<'a>(
     data: &'a [u8],
-) -> Result<(&[u8], Option<BitString<'a>>), ParseError> {
+) -> Result<(&[u8], Option<BitStringRef<'a>>), ParseError> {
     match try_get_explicit(data, ExplicitTag::try_new(1)?) {
         Ok((rest, inner)) => {
             let (inner, identifier) = expect_bit_string(inner)?;
@@ -134,7 +134,7 @@ fn parse_issuer_unique_id<'a>(
 
 fn parse_subject_unique_id<'a>(
     data: &'a [u8],
-) -> Result<(&[u8], Option<BitString<'a>>), ParseError> {
+) -> Result<(&[u8], Option<BitStringRef<'a>>), ParseError> {
     match try_get_explicit(data, ExplicitTag::try_new(2)?) {
         Ok((rest, inner)) => {
             let (inner, identifier) = expect_bit_string(inner)?;
@@ -148,7 +148,7 @@ fn parse_subject_unique_id<'a>(
 #[derive(Debug)]
 pub struct AlgorithmidentifierRef<'a> {
     algorithm_identifier: ObjectIdentifierRef<'a>,
-    parameters: Any<'a>,
+    parameters: AnyRef<'a>,
 }
 
 fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], AlgorithmidentifierRef), ParseError> {
@@ -168,7 +168,7 @@ fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], Algorithmidentifier
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AttributeTypeAndValueRef<'a> {
     attribute_type: ObjectIdentifierRef<'a>,
-    value: Any<'a>,
+    value: AnyRef<'a>,
 }
 
 impl<'a> AttributeTypeAndValueRef<'a> {
@@ -303,11 +303,11 @@ impl<'a> Iterator for DNIter<'a> {
 }
 
 #[derive(Debug)]
-enum Name<'a> {
+enum NameRef<'a> {
     DistinguishedNameRef(DistinguishedNameRef<'a>),
 }
 
-impl<'a> Name<'a> {
+impl<'a> NameRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         // right now there is only one CHOICE
         let (rest, dn) = DistinguishedNameRef::parse(data)?;
@@ -317,17 +317,17 @@ impl<'a> Name<'a> {
 
 #[derive(Debug)]
 enum TimeRef<'a> {
-    UTCTime(UTCTime<'a>),
-    GeneralizedTime(GeneralizedTime<'a>),
+    UTCTimeRef(UTCTimeRef<'a>),
+    GeneralizedTimeRef(GeneralizedTimeRef<'a>),
 }
 
 impl<'a> TimeRef<'a> {
     fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
         if let Ok((rest, utc)) = expect_utc_time(data) {
-            return Ok((rest, Self::UTCTime(utc)));
+            return Ok((rest, Self::UTCTimeRef(utc)));
         }
         if let Ok((rest, generalized)) = expect_generalized_time(data) {
-            return Ok((rest, Self::GeneralizedTime(generalized)));
+            return Ok((rest, Self::GeneralizedTimeRef(generalized)));
         }
 
         Err(ParseError::MalformedData)
@@ -358,7 +358,7 @@ impl<'a> ValidityRef<'a> {
 #[derive(Debug)]
 struct SubjectPublicKeyInfoRef<'a> {
     algorithm: AlgorithmidentifierRef<'a>,
-    subject_public_key: BitString<'a>,
+    subject_public_key: BitStringRef<'a>,
 }
 
 impl<'a> SubjectPublicKeyInfoRef<'a> {
@@ -425,7 +425,7 @@ impl<'a> Iterator for ExtensionsIter<'a> {
 pub struct ExtensionRef<'a> {
     extension_id: ObjectIdentifierRef<'a>,
     critical: bool,
-    value: OctetString<'a>,
+    value: OctetStringRef<'a>,
 }
 
 impl<'a> ExtensionRef<'a> {

@@ -1,9 +1,9 @@
 use std::fmt::{self, Debug, Display, Formatter};
 
 #[derive(PartialEq)]
-pub struct BMPString<'a>(&'a [u8]);
+pub struct BMPStringRef<'a>(&'a [u8]);
 
-impl<'a> Display for BMPString<'a> {
+impl<'a> Display for BMPStringRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         let u16s: Vec<u16> = self
             .0
@@ -18,7 +18,7 @@ impl<'a> Display for BMPString<'a> {
     }
 }
 
-impl<'a> Debug for BMPString<'a> {
+impl<'a> Debug for BMPStringRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         write!(f, "\"{}\"", self)
     }

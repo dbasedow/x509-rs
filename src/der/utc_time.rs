@@ -5,9 +5,9 @@ use std::fmt::{self, Debug, Display, Formatter};
 use super::{DataType, ascii_slice_to_u32, expect_type};
 
 #[derive(PartialEq)]
-pub struct UTCTime<'a>(&'a [u8]);
+pub struct UTCTimeRef<'a>(&'a [u8]);
 
-impl<'a> UTCTime<'a> {
+impl<'a> UTCTimeRef<'a> {
     pub fn to_datetime(&self) -> Result<DateTime<FixedOffset>, Error> {
         let data = self.0;
         let year = ascii_slice_to_u32(&data[..2])?;
@@ -62,7 +62,7 @@ impl<'a> UTCTime<'a> {
     }
 }
 
-impl<'a> Display for UTCTime<'a> {
+impl<'a> Display for UTCTimeRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         if let Ok(dt) = self.to_datetime() {
             write!(f, "{}", dt.to_rfc3339())
@@ -72,14 +72,14 @@ impl<'a> Display for UTCTime<'a> {
     }
 }
 
-impl<'a> Debug for UTCTime<'a> {
+impl<'a> Debug for UTCTimeRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> Result<(), fmt::Error> {
         write!(f, "\"{}\"", self)
     }
 }
 
-pub fn expect_utc_time(data: &[u8]) -> Result<(&[u8], UTCTime), ParseError> {
+pub fn expect_utc_time(data: &[u8]) -> Result<(&[u8], UTCTimeRef), ParseError> {
     let (rest, value) = expect_type(data, DataType::UTCTime)?;
 
-    Ok((rest, UTCTime(value)))
+    Ok((rest, UTCTimeRef(value)))
 }
