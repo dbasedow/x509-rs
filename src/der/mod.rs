@@ -95,7 +95,7 @@ impl From<DataType> for u8 {
     }
 }
 
-fn encode_tlv(tag: u8, value: &[u8]) -> Vec<u8> {
+pub fn encode_tlv(tag: u8, value: &[u8]) -> Vec<u8> {
     let mut res = Vec::new();
     res.push(tag);
 

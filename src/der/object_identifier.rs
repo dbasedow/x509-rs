@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use crate::error::ParseError;
 
-use super::{DataType, expect_type};
+use super::{encode_tlv, expect_type, DataType, ToDer};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ObjectIdentifier(Vec<u8>);
@@ -38,6 +38,12 @@ impl ObjectIdentifier {
             }
         }
         Ok(Self(data))
+    }
+}
+
+impl ToDer for ObjectIdentifier {
+    fn to_der(&self) -> Vec<u8> {
+        encode_tlv(DataType::ObjectIdentifier.into(), &self.0)
     }
 }
 
@@ -112,7 +118,6 @@ impl<'a> Debug for ObjectIdentifierRef<'a> {
         write!(f, "{}", self)
     }
 }
-
 
 pub fn expect_object_identifier(data: &[u8]) -> Result<(&[u8], ObjectIdentifierRef), ParseError> {
     let (rest, inner) = expect_type(data, DataType::ObjectIdentifier)?;

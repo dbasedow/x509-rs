@@ -1,5 +1,7 @@
 use crate::{
-    certificate::{expect_empty, parse_version, Version},
+    certificate::{
+        expect_empty, parse_algorithm_identifier, parse_version, AlgorithmidentifierRef, Version,
+    },
     der::{
         expect_bit_string, expect_boolean, expect_generalized_time, expect_integer,
         expect_object_identifier, expect_octet_string, expect_sequence, expect_set,
@@ -8,7 +10,7 @@ use crate::{
     },
     error::ParseError,
 };
-use std::{convert::TryFrom, fmt};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct TBSCertificateRef<'a> {
@@ -106,26 +108,6 @@ fn parse_subject_unique_id<'a>(
         }
         _ => Ok((data, None)),
     }
-}
-
-#[derive(Debug)]
-pub struct AlgorithmidentifierRef<'a> {
-    algorithm_identifier: ObjectIdentifierRef<'a>,
-    parameters: AnyRef<'a>,
-}
-
-fn parse_algorithm_identifier(data: &[u8]) -> Result<(&[u8], AlgorithmidentifierRef), ParseError> {
-    let (rest, inner) = expect_sequence(data)?;
-    let (inner, algorithm_identifier) = expect_object_identifier(inner)?;
-    let (inner, parameters) = take_any(inner)?;
-    expect_empty(inner)?;
-    Ok((
-        rest,
-        AlgorithmidentifierRef {
-            algorithm_identifier,
-            parameters,
-        },
-    ))
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
