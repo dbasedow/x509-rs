@@ -1,39 +1,14 @@
 use crate::{
+    certificate::{expect_empty, parse_version, Version},
     der::{
         expect_bit_string, expect_boolean, expect_generalized_time, expect_integer,
         expect_object_identifier, expect_octet_string, expect_sequence, expect_set,
-        expect_utc_time, take_any, try_get_explicit, AnyRef, BitStringRef, ExplicitTag, GeneralizedTimeRef,
-        IntegerRef, ObjectIdentifierRef, OctetStringRef, UTCTimeRef,
+        expect_utc_time, take_any, try_get_explicit, AnyRef, BitStringRef, ExplicitTag,
+        GeneralizedTimeRef, IntegerRef, ObjectIdentifierRef, OctetStringRef, UTCTimeRef,
     },
     error::ParseError,
 };
-use std::fmt;
-
-fn expect_empty(data: &[u8]) -> Result<(), ParseError> {
-    if !data.is_empty() {
-        return Err(ParseError::MalformedData);
-    }
-
-    Ok(())
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum Version {
-    V1,
-    V2,
-    V3,
-}
-
-impl Version {
-    fn try_from_i64(v: i64) -> Result<Self, ParseError> {
-        match v {
-            0 => Ok(Version::V1),
-            1 => Ok(Version::V2),
-            2 => Ok(Version::V3),
-            _ => Err(ParseError::InvalidVersion),
-        }
-    }
-}
+use std::{convert::TryFrom, fmt};
 
 #[derive(Debug)]
 pub struct TBSCertificateRef<'a> {
@@ -105,18 +80,6 @@ fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
     };
 
     Ok(tbs)
-}
-
-fn parse_version(data: &[u8]) -> Result<(&[u8], Version), ParseError> {
-    match try_get_explicit(data, ExplicitTag::try_new(0)?) {
-        Ok((rest, inner)) => {
-            let (inner, version) = expect_integer(inner)?;
-            // the version integer should take up all the space in the buffer
-            expect_empty(inner)?;
-            Ok((rest, Version::try_from_i64(version.to_i64()?)?))
-        }
-        _ => Ok((data, Version::V1)),
-    }
 }
 
 fn parse_issuer_unique_id<'a>(
