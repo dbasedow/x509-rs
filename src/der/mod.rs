@@ -72,6 +72,51 @@ impl TryFrom<u8> for DataType {
     }
 }
 
+impl From<DataType> for u8 {
+    fn from(t: DataType) -> Self {
+        match t {
+            DataType::Boolean => 0x01,
+            DataType::Integer => 0x02,
+            DataType::BitString => 0x03,
+            DataType::OctetString => 0x04,
+            DataType::Null => 0x05,
+            DataType::ObjectIdentifier => 0x06,
+            DataType::Utf8String => 0x0c,
+            DataType::Sequence => 0x10,
+            DataType::Set => 0x11,
+            DataType::PrintableString => 0x13,
+            DataType::T61String => 0x14,
+            DataType::IA5String => 0x16,
+            DataType::UTCTime => 0x17,
+            DataType::GeneralizedTime => 0x18,
+            DataType::VisibleString => 0x1a,
+            DataType::BMPString => 0x1e,
+        }
+    }
+}
+
+fn encode_tlv(tag: u8, value: &[u8]) -> Vec<u8> {
+    let mut res = Vec::new();
+    res.push(tag);
+
+    let len = value.len();
+    if len <= 127 {
+        // short encoding
+        res.push(len as u8);
+    } else {
+        // long encoding
+        let length_bytes = len.to_be_bytes();
+        let pos = length_bytes.iter().position(|b| *b != 0x00).unwrap(); // we can unwrap, since len > 127
+        let length_bytes_no_prefix = &length_bytes[pos..];
+        let length_length = length_bytes_no_prefix.len() as u8; // length of length is guaranteed to be <= 8 on 64bit systems
+        res.push(length_length);
+        res.extend_from_slice(length_bytes_no_prefix);
+    }
+    res.extend_from_slice(value);
+
+    res
+}
+
 /// returns (rest, tag, value)
 fn get_tlv(data: &[u8]) -> Result<(&[u8], u8, &[u8]), ParseError> {
     if data.len() < 2 {
@@ -151,6 +196,10 @@ impl ExplicitTag {
             Err(ParseError::UnsupportedTag(tag))
         }
     }
+
+    fn get_identifier_octet(&self) -> u8 {
+        0xa0 | self.0
+    }
 }
 
 pub fn try_get_explicit(data: &[u8], expected: ExplicitTag) -> Result<(&[u8], &[u8]), ParseError> {
@@ -167,6 +216,10 @@ pub fn try_get_explicit(data: &[u8], expected: ExplicitTag) -> Result<(&[u8], &[
     Ok((rest, inner_data))
 }
 
+pub fn wrap_in_explicit_tag(inner: &[u8], tag: ExplicitTag) -> Vec<u8> {
+    encode_tlv(tag.get_identifier_octet(), inner)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +234,17 @@ mod tests {
         assert!(rest.is_empty());
         assert_eq!(tag, 0x06);
         assert_eq!(hex::encode(value), "2a864886f70d");
+    }
+
+    #[test]
+    fn test_encode_tlv() {
+        let tlv = encode_tlv(0x02, &[0x01]);
+        let res = get_tlv(&tlv);
+        assert!(res.is_ok());
+        let (rest, tag, value) = res.ok().unwrap();
+        assert!(rest.is_empty());
+        assert_eq!(tag, 0x02);
+        assert_eq!(value, &[0x01]);
     }
 
     #[test]
@@ -216,6 +280,16 @@ mod tests {
         let (rest, _) = res.unwrap();
         assert!(rest.is_empty());
     }
+
+    #[test]
+    fn test_wrap_in_explicit() {
+        let res = wrap_in_explicit_tag(&[0x10, 0x10], ExplicitTag::try_new(0x01).unwrap());
+        assert_eq!(res, &[0xa1, 0x02, 0x10, 0x10]);
+    }
+}
+
+pub trait ToDer {
+    fn to_der(&self) -> Vec<u8>;
 }
 
 pub use any::{take_any, AnyRef};
@@ -224,7 +298,7 @@ pub use bmp_string::BMPStringRef;
 pub use boolean::{expect_boolean, Boolean};
 pub use generalized_time::{expect_generalized_time, GeneralizedTimeRef};
 pub use ia5_string::IA5StringRef;
-pub use integer::{expect_integer, IntegerRef};
+pub use integer::{expect_integer, IntegerRef, Integer};
 pub use object_identifier::{expect_object_identifier, ObjectIdentifier, ObjectIdentifierRef};
 pub use octet_string::{expect_octet_string, OctetStringRef};
 pub use printable_string::PrintableStringRef;

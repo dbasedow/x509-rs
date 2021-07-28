@@ -6,6 +6,7 @@ use std::string::FromUtf8Error;
 #[derive(Debug)]
 pub enum Error {
     ParseError(ParseError),
+    EncodingError(EncodingError),
     X509Error,
     IndexOutOfBoundsError,
     InvalidSignature,
@@ -19,6 +20,11 @@ pub enum ParseError {
     StringEncoding,
     UnexpectedTag(u8),
     InvalidVersion,
+}
+
+#[derive(Debug)]
+pub enum EncodingError {
+    StringNotAscii,
 }
 
 impl Display for Error {
