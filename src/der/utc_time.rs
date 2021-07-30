@@ -1,8 +1,7 @@
+use super::{ascii_slice_to_u32, expect_type, DataType};
 use crate::error::{Error, ParseError};
 use chrono::prelude::*;
 use std::fmt::{self, Debug, Display, Formatter};
-
-use super::{DataType, ascii_slice_to_u32, expect_type};
 
 #[derive(PartialEq)]
 pub struct UTCTimeRef<'a>(&'a [u8]);
@@ -11,7 +10,8 @@ impl<'a> UTCTimeRef<'a> {
     pub fn to_datetime(&self) -> Result<DateTime<FixedOffset>, Error> {
         let data = self.0;
         let year = ascii_slice_to_u32(&data[..2])?;
-        let year = year + 2000;
+        // the two digits represent dates from 1950 to 2050
+        let year = if year > 50 { year + 1900 } else { year + 2000 };
 
         let month = ascii_slice_to_u32(&data[2..4])?;
         let day = ascii_slice_to_u32(&data[4..6])?;
