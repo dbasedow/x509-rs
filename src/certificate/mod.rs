@@ -1,7 +1,9 @@
 mod algorithm_identifier;
+mod name;
 mod version;
 
-pub use algorithm_identifier::{parse_algorithm_identifier, AlgorithmidentifierRef};
+pub use algorithm_identifier::{parse_algorithm_identifier, AlgorithmidentifierRef, AlgorithmIdentifier};
+pub use name::{AttributeTypeAndValue, NameRef, Name, DistinguishedName, RelativeDistinguishedName};
 pub use version::{parse_version, Version};
 
 use crate::error::ParseError;

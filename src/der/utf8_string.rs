@@ -1,5 +1,7 @@
 use std::fmt::{self, Debug, Display, Formatter};
 
+use crate::error::EncodingError;
+
 use super::{DataType, ToDer};
 
 #[derive(PartialEq)]
@@ -30,7 +32,11 @@ impl Utf8String {
 }
 
 impl ToDer for Utf8String {
-    fn to_der(&self) -> Vec<u8> {
-        super::encode_tlv(DataType::Utf8String.into(), &self.0)
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(self.0.clone())
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::Utf8String.into()
     }
 }

@@ -1,4 +1,4 @@
-use crate::error::{Error, ParseError};
+use crate::error::{EncodingError, Error, ParseError};
 use std::convert::TryFrom;
 
 pub(crate) fn ascii_to_digit(d: u8) -> Result<u32, Error> {
@@ -197,7 +197,7 @@ impl ExplicitTag {
         }
     }
 
-    fn get_identifier_octet(&self) -> u8 {
+    pub fn get_identifier_octet(&self) -> u8 {
         0xa0 | self.0
     }
 }
@@ -289,7 +289,15 @@ mod tests {
 }
 
 pub trait ToDer {
-    fn to_der(&self) -> Vec<u8>;
+    /// encodes the inner value, without the length and tag
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError>;
+    /// encodes the whole value
+    fn to_der(&self) -> Result<Vec<u8>, EncodingError> {
+        let tlv = encode_tlv(self.get_tag(), &self.encode_inner()?);
+
+        Ok(tlv)
+    }
+    fn get_tag(&self) -> u8;
 }
 
 pub use any::{take_any, AnyRef};
@@ -298,13 +306,14 @@ pub use bmp_string::BMPStringRef;
 pub use boolean::{expect_boolean, Boolean};
 pub use generalized_time::{expect_generalized_time, GeneralizedTimeRef};
 pub use ia5_string::IA5StringRef;
-pub use integer::{expect_integer, IntegerRef, Integer};
+pub use integer::{expect_integer, Integer, IntegerRef};
+pub use null::Null;
 pub use object_identifier::{expect_object_identifier, ObjectIdentifier, ObjectIdentifierRef};
 pub use octet_string::{expect_octet_string, OctetStringRef};
 pub use printable_string::PrintableStringRef;
 pub use t61_string::T61StringRef;
 pub use utc_time::{expect_utc_time, UTCTimeRef};
-pub use utf8_string::Utf8StringRef;
+pub use utf8_string::{Utf8StringRef, Utf8String};
 pub use visible_string::VisibleStringRef;
 
 mod any;
@@ -314,6 +323,7 @@ mod boolean;
 mod generalized_time;
 mod ia5_string;
 mod integer;
+mod null;
 mod object_identifier;
 mod octet_string;
 mod printable_string;

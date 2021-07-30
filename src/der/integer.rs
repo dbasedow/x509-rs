@@ -1,4 +1,4 @@
-use crate::error::ParseError;
+use crate::error::{EncodingError, ParseError};
 use std::fmt::{self, Debug, Formatter};
 
 use super::{expect_type, DataType, ToDer};
@@ -80,8 +80,12 @@ impl Integer {
 }
 
 impl ToDer for Integer {
-    fn to_der(&self) -> Vec<u8> {
-        super::encode_tlv(DataType::Integer.into(), &self.0)
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(self.0.clone())
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::Integer.into()
     }
 }
 

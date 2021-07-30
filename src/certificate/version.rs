@@ -1,9 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::{
-    der::{expect_integer, try_get_explicit, wrap_in_explicit_tag, ExplicitTag, Integer, ToDer},
-    error::ParseError,
-};
+use crate::{der::{expect_integer, try_get_explicit, ExplicitTag, Integer, ToDer}, error::{EncodingError, ParseError}};
 
 use super::expect_empty;
 
@@ -38,14 +35,15 @@ impl From<&Version> for i64 {
 }
 
 impl ToDer for Version {
-    fn to_der(&self) -> Vec<u8> {
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
         let v: i64 = self.into();
 
         let i = Integer::from_i64(v);
-        let int_bytes = i.to_der();
-        let wrapped = wrap_in_explicit_tag(&int_bytes, ExplicitTag::try_new(0).unwrap());
+        i.to_der()
+    }
 
-        wrapped
+    fn get_tag(&self) -> u8 {
+        ExplicitTag::try_new(0).unwrap().get_identifier_octet()
     }
 }
 
@@ -59,4 +57,10 @@ pub fn parse_version(data: &[u8]) -> Result<(&[u8], Version), ParseError> {
         }
         _ => Ok((data, Version::V1)),
     }
+}
+
+#[test]
+fn test_encode_version() {
+    let der = Version::V3.to_der();
+    assert_eq!(der.unwrap(), &[0xa0, 0x03, 0x02, 0x01, 0x02]);
 }

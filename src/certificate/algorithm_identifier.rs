@@ -1,10 +1,7 @@
-use crate::{
-    der::{
-        encode_tlv, expect_object_identifier, expect_sequence, take_any, AnyRef, DataType,
-        ObjectIdentifier, ObjectIdentifierRef, ToDer,
-    },
-    error::ParseError,
-};
+use crate::{der::{
+        expect_object_identifier, expect_sequence, take_any, AnyRef, DataType, ObjectIdentifier,
+        ObjectIdentifierRef, ToDer,
+    }, error::{EncodingError, ParseError}};
 
 use super::expect_empty;
 
@@ -35,12 +32,25 @@ pub struct AlgorithmIdentifier {
     parameters: Box<dyn ToDer>, // any type
 }
 
-impl ToDer for AlgorithmIdentifier {
-    fn to_der(&self) -> Vec<u8> {
-        let mut algorithm_identifier = self.algorithm_identifier.to_der();
-        let params = self.parameters.to_der();
-        algorithm_identifier.extend_from_slice(&params);
+impl AlgorithmIdentifier {
+    pub fn new(algorithm_identifier: ObjectIdentifier, parameters: Box<dyn ToDer>) -> Self {
+        Self {
+            algorithm_identifier,
+            parameters,
+        }
+    }
+}
 
-        encode_tlv(DataType::Sequence.into(), &algorithm_identifier)
+impl ToDer for AlgorithmIdentifier {
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        let mut algorithm_identifier = self.algorithm_identifier.to_der()?;
+        let params = self.parameters.to_der()?;
+        algorithm_identifier.extend_from_slice(&params);
+        
+        Ok(algorithm_identifier)
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::Sequence.into()
     }
 }

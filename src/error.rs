@@ -25,6 +25,7 @@ pub enum ParseError {
 #[derive(Debug)]
 pub enum EncodingError {
     StringNotAscii,
+    MissingRequiredField(&'static str),
 }
 
 impl Display for Error {

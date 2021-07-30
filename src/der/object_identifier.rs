@@ -1,9 +1,9 @@
 use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 
-use crate::error::ParseError;
+use crate::error::{EncodingError, ParseError};
 
-use super::{encode_tlv, expect_type, DataType, ToDer};
+use super::{expect_type, DataType, ToDer};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ObjectIdentifier(Vec<u8>);
@@ -42,8 +42,12 @@ impl ObjectIdentifier {
 }
 
 impl ToDer for ObjectIdentifier {
-    fn to_der(&self) -> Vec<u8> {
-        encode_tlv(DataType::ObjectIdentifier.into(), &self.0)
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(self.0.clone())
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::ObjectIdentifier.into()
     }
 }
 

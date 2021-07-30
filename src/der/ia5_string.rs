@@ -49,7 +49,11 @@ impl TryFrom<&str> for IA5String {
 }
 
 impl ToDer for IA5String {
-    fn to_der(&self) -> Vec<u8> {
-        super::encode_tlv(DataType::IA5String.into(), &self.0)
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        Ok(self.0.clone())
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::IA5String.into()
     }
 }
