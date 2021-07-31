@@ -7,7 +7,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 pub struct UTCTimeRef<'a>(&'a [u8]);
 
 impl<'a> UTCTimeRef<'a> {
-    pub fn to_datetime(&self) -> Result<DateTime<FixedOffset>, Error> {
+    pub fn to_datetime(&self) -> Result<DateTime<Utc>, Error> {
         let data = self.0;
         let year = ascii_slice_to_u32(&data[..2])?;
         // the two digits represent dates from 1950 to 2050
@@ -19,38 +19,31 @@ impl<'a> UTCTimeRef<'a> {
         let hour = ascii_slice_to_u32(&data[6..8])?;
         let minute = ascii_slice_to_u32(&data[8..10])?;
 
+        let mut data = &data[10..];
         let second;
-        if data.len() == 13 || data.len() == 17 {
-            second = ascii_slice_to_u32(&data[10..12])?;
+        if data.len() == 3 || data.len() == 7 {
+            second = ascii_slice_to_u32(&data[0..2])?;
+            data = &data[2..];
         } else {
             second = 0;
         }
 
         let utc_offset: i32;
-        if data.len() == 17 {
-            let hour_offset = ascii_slice_to_u32(&data[11..13])?;
-            let minute_offset = ascii_slice_to_u32(&data[14..16])?;
-            let factor = if data[10] == 0x2d {
-                // '-'
-                -1
-            } else {
-                1
-            };
-
-            utc_offset = factor * (hour_offset * 3600 + minute_offset * 60) as i32;
-        } else if data.len() == 19 {
-            let hour_offset = ascii_slice_to_u32(&data[13..15])?;
-            let minute_offset = ascii_slice_to_u32(&data[16..18])?;
-            let factor = if data[12] == 0x2d {
-                // '-'
-                -1
-            } else {
-                1
-            };
-
-            utc_offset = factor * (hour_offset * 3600 + minute_offset * 60) as i32;
-        } else {
+        if data[0] == 0x5a {
+            // 'Z'
             utc_offset = 0;
+        } else {
+            assert!(data.len() == 5);
+            let hour_offset = ascii_slice_to_u32(&data[1..3])?;
+            let minute_offset = ascii_slice_to_u32(&data[3..5])?;
+            let factor = if data[0] == 0x2d {
+                // '-'
+                -1
+            } else {
+                1
+            };
+
+            utc_offset = factor * (hour_offset * 3600 + minute_offset * 60) as i32;
         }
 
         let offset = FixedOffset::east(utc_offset);
@@ -58,7 +51,7 @@ impl<'a> UTCTimeRef<'a> {
             .ymd(year as i32, month, day)
             .and_hms(hour, minute, second);
 
-        Ok(dt)
+        Ok(dt.with_timezone(&Utc))
     }
 }
 
@@ -82,4 +75,68 @@ pub fn expect_utc_time(data: &[u8]) -> Result<(&[u8], UTCTimeRef), ParseError> {
     let (rest, value) = expect_type(data, DataType::UTCTime)?;
 
     Ok((rest, UTCTimeRef(value)))
+}
+
+#[test]
+fn test_utc_time_parsing_no_secs_zulu() {
+    //YYMMDDhhmmZ
+    let ref_dt = Utc.ymd(2021, 7, 31).and_hms(16, 44, 00);
+    let d = ref_dt.format("%y%m%d%H%MZ").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime();
+    assert_eq!(res.unwrap(), ref_dt);
+}
+
+#[test]
+fn test_utc_time_parsing_no_secs_pos_tz_offset() {
+    // YYMMDDhhmm+hh'mm'
+    let offset = FixedOffset::east(3600);
+    let ref_dt_no_secs = offset.ymd(2021, 7, 31).and_hms(16, 44, 00);
+    let d = ref_dt_no_secs.format("%y%m%d%H%M%z").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime().unwrap();
+    assert_eq!(res, ref_dt_no_secs);
+}
+
+#[test]
+fn test_utc_time_parsing_no_secs_neg_tz_offset() {
+    // YYMMDDhhmm-hh'mm'
+    let offset = FixedOffset::west(3600);
+    let ref_dt_no_secs = offset.ymd(2021, 7, 31).and_hms(16, 44, 00);
+    let d = ref_dt_no_secs.format("%y%m%d%H%M%z").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime().unwrap();
+    assert_eq!(res, ref_dt_no_secs);
+}
+
+#[test]
+fn test_utc_time_parsing_with_secs_zulu() {
+    // YYMMDDhhmmssZ
+    let ref_dt = Utc.ymd(2021, 7, 31).and_hms(16, 44, 40);
+    let d = ref_dt.format("%y%m%d%H%M%SZ").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime();
+    assert_eq!(res.unwrap(), ref_dt);
+}
+
+#[test]
+fn test_utc_time_parsing_with_secs_pos_tz_offset() {
+    // YYMMDDhhmmss+hh'mm'
+    let offset = FixedOffset::east(3600);
+    let ref_dt_no_secs = offset.ymd(2021, 7, 31).and_hms(16, 44, 00);
+    let d = ref_dt_no_secs.format("%y%m%d%H%M%S%z").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime().unwrap();
+    assert_eq!(res, ref_dt_no_secs);
+}
+
+#[test]
+fn test_utc_time_parsing_with_secs_neg_tz_offset() {
+    // YYMMDDhhmmss-hh'mm'
+    let offset = FixedOffset::west(3600);
+    let ref_dt_no_secs = offset.ymd(2021, 7, 31).and_hms(16, 44, 00);
+    let d = ref_dt_no_secs.format("%y%m%d%H%M%S%z").to_string();
+    let utc = UTCTimeRef(&d.as_bytes());
+    let res = utc.to_datetime().unwrap();
+    assert_eq!(res, ref_dt_no_secs);
 }
