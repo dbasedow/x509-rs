@@ -1,13 +1,12 @@
 use crate::{
     certificate::{
         expect_empty, parse_algorithm_identifier, parse_version, AlgorithmidentifierRef, NameRef,
-        Version,
+        SubjectPublicKeyInfoRef, ValidityRef, Version,
     },
     der::{
-        expect_bit_string, expect_boolean, expect_generalized_time, expect_integer,
-        expect_object_identifier, expect_octet_string, expect_sequence, expect_utc_time,
-        try_get_explicit, BitStringRef, ExplicitTag, GeneralizedTimeRef, IntegerRef,
-        ObjectIdentifierRef, OctetStringRef, UTCTimeRef,
+        expect_bit_string, expect_boolean, expect_integer, expect_object_identifier,
+        expect_octet_string, expect_sequence, try_get_explicit, BitStringRef, ExplicitTag,
+        IntegerRef, ObjectIdentifierRef, OctetStringRef,
     },
     error::ParseError,
 };
@@ -39,8 +38,7 @@ impl<'a> CertificateRef<'a> {
         // the root sequence should take up all the space in the buffer
         expect_empty(left)?;
 
-        let (data, tbs_data) = expect_sequence(root)?;
-        let tbs_cert = parse_tbs(tbs_data)?;
+        let (data, tbs_cert) = expect_tbs(root)?;
         let (data, signature_algorithm) = parse_algorithm_identifier(data)?;
         let (data, signature) = expect_bit_string(data)?;
         expect_empty(data)?;
@@ -53,6 +51,12 @@ impl<'a> CertificateRef<'a> {
 
         Ok(cert)
     }
+}
+
+pub(crate) fn expect_tbs<'a>(data: &'a [u8]) -> Result<(&[u8], TBSCertificateRef), ParseError> {
+    let (data, tbs_data) = expect_sequence(data)?;
+    let tbs_cert = parse_tbs(tbs_data)?;
+    Ok((data, tbs_cert))
 }
 
 fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
@@ -107,67 +111,6 @@ fn parse_subject_unique_id<'a>(
             Ok((rest, Some(identifier)))
         }
         _ => Ok((data, None)),
-    }
-}
-
-#[derive(Debug)]
-enum TimeRef<'a> {
-    UTCTimeRef(UTCTimeRef<'a>),
-    GeneralizedTimeRef(GeneralizedTimeRef<'a>),
-}
-
-impl<'a> TimeRef<'a> {
-    fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
-        if let Ok((rest, utc)) = expect_utc_time(data) {
-            return Ok((rest, Self::UTCTimeRef(utc)));
-        }
-        if let Ok((rest, generalized)) = expect_generalized_time(data) {
-            return Ok((rest, Self::GeneralizedTimeRef(generalized)));
-        }
-
-        Err(ParseError::MalformedData)
-    }
-}
-
-#[derive(Debug)]
-pub struct ValidityRef<'a> {
-    not_before: TimeRef<'a>,
-    not_after: TimeRef<'a>,
-}
-
-impl<'a> ValidityRef<'a> {
-    fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
-        let (rest, data) = expect_sequence(data)?;
-        let (data, not_before) = TimeRef::parse(data)?;
-        let (data, not_after) = TimeRef::parse(data)?;
-        expect_empty(data)?;
-        let validity = Self {
-            not_after,
-            not_before,
-        };
-
-        Ok((rest, validity))
-    }
-}
-
-#[derive(Debug)]
-struct SubjectPublicKeyInfoRef<'a> {
-    algorithm: AlgorithmidentifierRef<'a>,
-    subject_public_key: BitStringRef<'a>,
-}
-
-impl<'a> SubjectPublicKeyInfoRef<'a> {
-    fn parse(data: &'a [u8]) -> Result<(&'a [u8], Self), ParseError> {
-        let (rest, data) = expect_sequence(data)?;
-        let (data, algorithm) = parse_algorithm_identifier(data)?;
-        let (data, subject_public_key) = expect_bit_string(data)?;
-        expect_empty(data)?;
-        let spki = Self {
-            algorithm,
-            subject_public_key,
-        };
-
-        Ok((rest, spki))
     }
 }
 

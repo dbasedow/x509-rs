@@ -1,4 +1,5 @@
 use crate::error::{EncodingError, Error, ParseError};
+use chrono::prelude::*;
 use std::convert::TryFrom;
 
 pub(crate) fn ascii_to_digit(d: u8) -> Result<u32, Error> {
@@ -95,6 +96,13 @@ impl From<DataType> for u8 {
     }
 }
 
+impl DataType {
+    pub fn constructed(self) -> u8 {
+        let tag: u8 = self.into();
+        tag | 0x20
+    }
+}
+
 pub fn encode_tlv(tag: u8, value: &[u8]) -> Vec<u8> {
     let mut res = Vec::new();
     res.push(tag);
@@ -109,7 +117,8 @@ pub fn encode_tlv(tag: u8, value: &[u8]) -> Vec<u8> {
         let pos = length_bytes.iter().position(|b| *b != 0x00).unwrap(); // we can unwrap, since len > 127
         let length_bytes_no_prefix = &length_bytes[pos..];
         let length_length = length_bytes_no_prefix.len() as u8; // length of length is guaranteed to be <= 8 on 64bit systems
-        res.push(length_length);
+        let length_length_flagged = length_length | 0x80;
+        res.push(length_length_flagged);
         res.extend_from_slice(length_bytes_no_prefix);
     }
     res.extend_from_slice(value);
@@ -300,8 +309,50 @@ pub trait ToDer {
     fn get_tag(&self) -> u8;
 }
 
+impl ToDer for DateTime<Utc> {
+    fn encode_inner(&self) -> Result<Vec<u8>, crate::error::EncodingError> {
+        let year = self.year();
+        if year >= 1950 && year < 2049 {
+            let yy = year % 100;
+            let s = format!(
+                "{}{}{}{}{}{}Z",
+                yy,
+                self.month(),
+                self.day(),
+                self.hour(),
+                self.minute(),
+                self.second()
+            );
+
+            Ok(s.as_bytes().to_vec())
+        } else {
+            let yy = year % 100;
+            let s = format!(
+                "{}{}{}{}{}{}Z",
+                yy,
+                self.month(),
+                self.day(),
+                self.hour(),
+                self.minute(),
+                self.second()
+            );
+
+            Ok(s.as_bytes().to_vec())
+        }
+    }
+
+    fn get_tag(&self) -> u8 {
+        let year = self.year();
+        if year >= 1950 && year < 2049 {
+            DataType::UTCTime.into()
+        } else {
+            DataType::GeneralizedTime.into()
+        }
+    }
+}
+
 pub use any::{take_any, AnyRef};
-pub use bit_string::{expect_bit_string, BitStringRef};
+pub use bit_string::{expect_bit_string, BitStringRef, BitString};
 pub use bmp_string::BMPStringRef;
 pub use boolean::{expect_boolean, Boolean};
 pub use generalized_time::{expect_generalized_time, GeneralizedTimeRef};
@@ -313,7 +364,7 @@ pub use octet_string::{expect_octet_string, OctetStringRef};
 pub use printable_string::PrintableStringRef;
 pub use t61_string::T61StringRef;
 pub use utc_time::{expect_utc_time, UTCTimeRef};
-pub use utf8_string::{Utf8StringRef, Utf8String};
+pub use utf8_string::{Utf8String, Utf8StringRef};
 pub use visible_string::VisibleStringRef;
 
 mod any;

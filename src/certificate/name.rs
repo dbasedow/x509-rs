@@ -66,7 +66,7 @@ impl ToDer for AttributeTypeAndValue {
     }
 
     fn get_tag(&self) -> u8 {
-        DataType::Sequence.into()
+        DataType::Sequence.constructed()
     }
 }
 
@@ -95,7 +95,7 @@ impl ToDer for RelativeDistinguishedName {
     }
 
     fn get_tag(&self) -> u8 {
-        DataType::Set.into()
+        DataType::Set.constructed()
     }
 }
 
@@ -119,7 +119,7 @@ impl ToDer for DistinguishedName {
     }
 
     fn get_tag(&self) -> u8 {
-        DataType::Sequence.into()
+        DataType::Sequence.constructed()
     }
 }
 

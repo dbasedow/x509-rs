@@ -51,6 +51,6 @@ impl ToDer for AlgorithmIdentifier {
     }
 
     fn get_tag(&self) -> u8 {
-        DataType::Sequence.into()
+        DataType::Sequence.constructed()
     }
 }
