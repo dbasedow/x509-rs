@@ -1,7 +1,7 @@
 use crate::error::ParseError;
 use std::fmt::{self, Debug, Formatter};
 
-use super::{expect_type, DataType};
+use super::{expect_type, DataType, ToDer};
 
 #[derive(PartialEq)]
 pub struct Boolean(u8);
@@ -26,4 +26,30 @@ pub fn expect_boolean(data: &[u8]) -> Result<(&[u8], Boolean), ParseError> {
     }
 
     Ok((rest, Boolean(value[0])))
+}
+
+impl ToDer for Boolean {
+    fn encode_inner(&self) -> Result<Vec<u8>, crate::error::EncodingError> {
+        Ok(vec![self.0; 1])
+    }
+
+    fn get_tag(&self) -> u8 {
+        DataType::Boolean.into()
+    }
+}
+
+impl From<Boolean> for bool {
+    fn from(v: Boolean) -> Self {
+        v.to_bool()
+    }
+}
+
+impl From<bool> for Boolean {
+    fn from(b: bool) -> Self {
+        if b {
+            Boolean(0xff)
+        } else {
+            Boolean(0x00)
+        }
+    }
 }

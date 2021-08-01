@@ -15,6 +15,12 @@ pub fn expect_octet_string(data: &[u8]) -> Result<(&[u8], OctetStringRef), Parse
 
 pub struct OctetString(Vec<u8>);
 
+impl OctetString {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self(data)
+    }
+}
+
 impl ToDer for OctetString {
     fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
         Ok(self.0.clone())

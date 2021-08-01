@@ -1,6 +1,6 @@
 use crate::{
-    certificate::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo, Validity, Version},
-    der::{DataType, Integer, ToDer},
+    certificate::{AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version},
+    der::{wrap_in_explicit_tag, DataType, ExplicitTag, Integer, ToDer},
     error::EncodingError,
 };
 
@@ -13,6 +13,7 @@ pub struct TBSCertificate {
     validity: Validity,
     subject: Name,
     subject_public_key_info: SubjectPublicKeyInfo,
+    extensions: Option<Extensions>,
 }
 
 impl ToDer for TBSCertificate {
@@ -25,6 +26,14 @@ impl ToDer for TBSCertificate {
         tbs.extend_from_slice(&self.validity.to_der()?);
         tbs.extend_from_slice(&self.subject.to_der()?);
         tbs.extend_from_slice(&self.subject_public_key_info.to_der()?);
+        if let Some(extensions) = &self.extensions {
+            assert!(extensions.len() >= 1);
+            let extensions_der = extensions.to_der()?;
+            tbs.extend_from_slice(&wrap_in_explicit_tag(
+                &extensions_der,
+                ExplicitTag::try_new(3).unwrap(),
+            ));
+        }
 
         Ok(tbs)
     }
@@ -71,6 +80,15 @@ fn test_tbs_cert_builder() {
     let public_key = crate::der::BitString::new(vec![20; 256], 2048);
     let sub_pub_key_info = SubjectPublicKeyInfo::new(algorithm_identifier_subject_key, public_key);
 
+    //EXTENSION
+    let mut extensions = Extensions::default();
+    let extension = crate::certificate::Extension::new(
+        crate::der::ObjectIdentifier::from_str("3.8.7").unwrap(),
+        false.into(),
+        crate::der::OctetString::new(vec![3; 2]),
+    );
+    extensions.add(extension);
+
     let tbs = builder
         .serial_number(Integer::from_i64(10))
         .signature(AlgorithmIdentifier::new(
@@ -81,10 +99,11 @@ fn test_tbs_cert_builder() {
         .validity(validity)
         .subject(Name::DistinguishedName(subject_dn))
         .subject_public_key_info(sub_pub_key_info)
+        .extensions(Some(extensions))
         .build()
         .unwrap();
     let tbs_bytes = tbs.to_der().unwrap();
 
     let res = crate::cert_parsing::expect_tbs(&tbs_bytes);
-    let res = res.unwrap();
+    assert!(res.is_ok());
 }

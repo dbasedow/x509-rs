@@ -360,7 +360,7 @@ pub use ia5_string::IA5StringRef;
 pub use integer::{expect_integer, Integer, IntegerRef};
 pub use null::Null;
 pub use object_identifier::{expect_object_identifier, ObjectIdentifier, ObjectIdentifierRef};
-pub use octet_string::{expect_octet_string, OctetStringRef};
+pub use octet_string::{expect_octet_string, OctetStringRef, OctetString};
 pub use printable_string::PrintableStringRef;
 pub use t61_string::T61StringRef;
 pub use utc_time::{expect_utc_time, UTCTimeRef};

@@ -1,13 +1,19 @@
 mod algorithm_identifier;
+mod extensions;
 mod name;
 mod subject_public_key_info;
 mod validity;
 mod version;
 
-pub use algorithm_identifier::{parse_algorithm_identifier, AlgorithmidentifierRef, AlgorithmIdentifier};
-pub use name::{AttributeTypeAndValue, NameRef, Name, DistinguishedName, RelativeDistinguishedName};
-pub use subject_public_key_info::{SubjectPublicKeyInfoRef, SubjectPublicKeyInfo};
-pub use validity::{ValidityRef, Validity};
+pub use algorithm_identifier::{
+    parse_algorithm_identifier, AlgorithmIdentifier, AlgorithmidentifierRef,
+};
+pub use extensions::{ExtensionRef, ExtensionsRef, Extension, Extensions};
+pub use name::{
+    AttributeTypeAndValue, DistinguishedName, Name, NameRef, RelativeDistinguishedName,
+};
+pub use subject_public_key_info::{SubjectPublicKeyInfo, SubjectPublicKeyInfoRef};
+pub use validity::{Validity, ValidityRef};
 pub use version::{parse_version, Version};
 
 use crate::error::ParseError;
