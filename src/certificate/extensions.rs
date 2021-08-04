@@ -82,6 +82,12 @@ impl<'a> ExtensionRef<'a> {
     }
 }
 
+pub trait IntoExtension {
+    fn extension_id(&self) -> ObjectIdentifier;
+    fn critical(&self) -> Boolean;
+    fn value(&self) -> OctetString;
+}
+
 pub struct Extension {
     extension_id: ObjectIdentifier,
     critical: Boolean,
