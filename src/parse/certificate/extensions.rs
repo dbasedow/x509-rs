@@ -5,7 +5,7 @@ use super::super::der::{
 use super::super::error::ParseError;
 use super::expect_empty;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExtensionsRef<'a>(&'a [u8]);
 
 impl<'a> ExtensionsRef<'a> {
@@ -21,9 +21,28 @@ impl<'a> ExtensionsRef<'a> {
     }
 }
 
+impl<'a> IntoIterator for ExtensionsRef<'a> {
+    type Item = Result<ExtensionRef<'a>, ParseError>;
+
+    type IntoIter = ExtensionsIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ExtensionsIter::new(self.0)
+    }
+}
+
 pub struct ExtensionsIter<'a> {
     pos: &'a [u8],
     failure: bool,
+}
+
+impl<'a> ExtensionsIter<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Self {
+            pos: data,
+            failure: false,
+        }
+    }
 }
 
 impl<'a> Iterator for ExtensionsIter<'a> {
@@ -75,4 +94,28 @@ impl<'a> ExtensionRef<'a> {
         };
         Ok((rest, extension))
     }
+
+    pub fn extension_id(&self) -> &ObjectIdentifierRef<'a> {
+        &self.extension_id
+    }
+
+    pub fn critical(&self) -> bool {
+        self.critical
+    }
+
+    pub fn value(&self) -> &OctetStringRef<'a> {
+        &self.value
+    }
+}
+
+#[test]
+fn test_extensions() {
+    let data = include_bytes!("../../../certs/test.crt");
+    let r = crate::parse::parsing::CertificateRef::from_slice(data);
+    assert!(r.is_ok());
+    let cert = r.unwrap();
+    let tbs = cert.tbs_cert();
+    let extensions = tbs.extensions().unwrap();
+    let extensions: Vec<ExtensionRef> = extensions.into_iter().map(Result::unwrap).collect();
+    assert_eq!(9, extensions.len());
 }
