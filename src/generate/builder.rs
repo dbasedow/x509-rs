@@ -1,9 +1,9 @@
 use super::{
-    certificate::{AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version},
+    certificate::{AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity},
     der::{wrap_in_explicit_tag, DataType, Integer, ToDer},
     error::EncodingError,
 };
-use crate::common::der::ExplicitTag;
+use crate::common::{certificate::Version, der::ExplicitTag};
 
 #[derive(Builder)]
 #[builder(pattern = "owned")]

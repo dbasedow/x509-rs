@@ -1,7 +1,7 @@
 use super::{
     certificate::{
         expect_empty, parse_algorithm_identifier, parse_version, AlgorithmidentifierRef,
-        ExtensionsRef, NameRef, SubjectPublicKeyInfoRef, ValidityRef, Version,
+        ExtensionsRef, NameRef, SubjectPublicKeyInfoRef, ValidityRef,
     },
     der::{
         expect_bit_string, expect_integer, expect_sequence, try_get_explicit, BitStringRef,
@@ -9,6 +9,7 @@ use super::{
     },
     error::ParseError,
 };
+use crate::common::certificate::Version;
 
 #[derive(Debug)]
 pub struct TBSCertificateRef<'a> {
@@ -22,6 +23,12 @@ pub struct TBSCertificateRef<'a> {
     issuer_unique_id: Option<BitStringRef<'a>>,
     subject_unique_id: Option<BitStringRef<'a>>,
     extensions: Option<ExtensionsRef<'a>>,
+}
+
+impl<'a> TBSCertificateRef<'a> {
+    pub fn extensions(&self) -> Option<ExtensionsRef> {
+        self.extensions
+    }
 }
 
 #[derive(Debug)]
@@ -49,6 +56,10 @@ impl<'a> CertificateRef<'a> {
         };
 
         Ok(cert)
+    }
+
+    pub fn tbs_cert(&self) -> &TBSCertificateRef<'a> {
+        &self.tbs_cert
     }
 }
 

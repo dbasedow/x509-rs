@@ -2,24 +2,7 @@ use super::super::{
     der::{Integer, ToDer},
     error::EncodingError,
 };
-use crate::common::der::ExplicitTag;
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum Version {
-    V1,
-    V2,
-    V3,
-}
-
-impl From<&Version> for i64 {
-    fn from(v: &Version) -> Self {
-        match v {
-            Version::V1 => 0,
-            Version::V2 => 1,
-            Version::V3 => 2,
-        }
-    }
-}
+use crate::common::{certificate::Version, der::ExplicitTag};
 
 impl ToDer for Version {
     fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {

@@ -10,7 +10,7 @@ pub use extensions::{ExtensionRef, ExtensionsRef};
 pub use name::NameRef;
 pub use subject_public_key_info::SubjectPublicKeyInfoRef;
 pub use validity::ValidityRef;
-pub use version::{parse_version, Version};
+pub use version::{parse_version};
 
 use super::error::ParseError;
 
