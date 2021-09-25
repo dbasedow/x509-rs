@@ -107,7 +107,9 @@ impl<'a> Display for ObjectIdentifierRef<'a> {
 
 impl<'a> Debug for ObjectIdentifierRef<'a> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self)
+        f.debug_tuple("ObjectIdentifierRef")
+            .field(&format!("{}", self))
+            .finish()
     }
 }
 

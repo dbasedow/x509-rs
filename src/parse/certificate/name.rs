@@ -61,14 +61,15 @@ impl<'a> RelativeDistinguishedNameRef<'a> {
 
 impl<'a> fmt::Debug for RelativeDistinguishedNameRef<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut set_builder = f.debug_set();
         for attr in self.iter() {
             if let Ok(attr) = attr {
-                write!(f, "{:?}", attr)?;
+                set_builder.entry(&attr);
             } else {
-                write!(f, "error in RDN")?;
+                set_builder.entry(&"error in RDN");
             }
         }
-        writeln!(f, "")
+        set_builder.finish()
     }
 }
 
@@ -110,9 +111,23 @@ impl<'a> RelativeDistinguishedNameRef<'a> {
         Ok((rest, rdns))
     }
 }
-#[derive(Debug)]
+
 pub struct DistinguishedNameRef<'a> {
     data: &'a [u8],
+}
+
+impl<'a> fmt::Debug for DistinguishedNameRef<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut set = f.debug_set();
+        for dn in self.iter() {
+            if let Ok(dn) = dn {
+                set.entry(&dn);
+            } else {
+                set.entry(&dn.err());
+            }
+        }
+        set.finish()
+    }
 }
 
 impl<'a> DistinguishedNameRef<'a> {

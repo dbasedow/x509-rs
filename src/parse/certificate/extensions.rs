@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::super::der::{
     expect_boolean, expect_object_identifier, expect_octet_string, expect_sequence,
     try_get_explicit, ExplicitTag, ObjectIdentifierRef, OctetStringRef,
@@ -5,7 +7,7 @@ use super::super::der::{
 use super::super::error::ParseError;
 use super::expect_empty;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ExtensionsRef<'a>(&'a [u8]);
 
 impl<'a> ExtensionsRef<'a> {
@@ -18,6 +20,16 @@ impl<'a> ExtensionsRef<'a> {
             }
             _ => Ok((data, None)),
         }
+    }
+}
+
+impl<'a> fmt::Debug for ExtensionsRef<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut list = f.debug_list();
+        for ext in self.into_iter() {
+            list.entry(&ext);
+        }
+        list.finish()
     }
 }
 
@@ -70,6 +82,7 @@ impl<'a> Iterator for ExtensionsIter<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct ExtensionRef<'a> {
     extension_id: ObjectIdentifierRef<'a>,
     critical: bool,
