@@ -29,6 +29,14 @@ impl<'a> TBSCertificateRef<'a> {
     pub fn extensions(&self) -> Option<ExtensionsRef> {
         self.extensions
     }
+
+    pub fn algorithm_identifier(&self) -> &AlgorithmidentifierRef {
+        &self.algorithm_identifier
+    }
+
+    pub fn subject_public_key_info(&self) -> &SubjectPublicKeyInfoRef {
+        &self.subject_public_key_info
+    }
 }
 
 #[derive(Debug)]

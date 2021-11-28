@@ -23,4 +23,8 @@ impl<'a> SubjectPublicKeyInfoRef<'a> {
 
         Ok((rest, spki))
     }
+
+    pub fn algorithm_identifier(&self) -> &AlgorithmidentifierRef {
+        &self.algorithm
+    }
 }
