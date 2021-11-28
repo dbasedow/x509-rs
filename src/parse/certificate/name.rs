@@ -1,15 +1,15 @@
 use std::fmt;
 
-use super::expect_empty;
 use super::super::{
     der::{
         expect_object_identifier, expect_sequence, expect_set, take_any, AnyRef,
         ObjectIdentifierRef,
     },
-    error::{ParseError},
+    error::ParseError,
 };
+use super::expect_empty;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum NameRef<'a> {
     DistinguishedNameRef(DistinguishedNameRef<'a>),
 }
@@ -112,6 +112,7 @@ impl<'a> RelativeDistinguishedNameRef<'a> {
     }
 }
 
+#[derive(PartialEq, Eq)]
 pub struct DistinguishedNameRef<'a> {
     data: &'a [u8],
 }

@@ -3,8 +3,8 @@ use std::fmt::{self, Debug, Formatter};
 
 use super::{expect_type, DataType};
 
-#[derive(PartialEq)]
-pub struct IntegerRef<'a>(&'a [u8]);
+#[derive(PartialEq, Eq, Hash)]
+pub struct IntegerRef<'a>(pub(crate) &'a [u8]);
 
 impl<'a> IntegerRef<'a> {
     pub fn to_i64(&self) -> Result<i64, ParseError> {

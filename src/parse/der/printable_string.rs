@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug, Display, Formatter};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq, Hash)]
 pub struct PrintableStringRef<'a>(&'a [u8]);
 
 impl<'a> PrintableStringRef<'a> {

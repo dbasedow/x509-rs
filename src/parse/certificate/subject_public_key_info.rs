@@ -1,8 +1,8 @@
-use super::{expect_empty, parse_algorithm_identifier, AlgorithmidentifierRef};
 use super::super::{
     der::{expect_bit_string, expect_sequence, BitStringRef},
     error::ParseError,
 };
+use super::{expect_empty, parse_algorithm_identifier, AlgorithmidentifierRef};
 
 #[derive(Debug)]
 pub struct SubjectPublicKeyInfoRef<'a> {
@@ -26,5 +26,9 @@ impl<'a> SubjectPublicKeyInfoRef<'a> {
 
     pub fn algorithm_identifier(&self) -> &AlgorithmidentifierRef {
         &self.algorithm
+    }
+
+    pub fn subject_public_key(&self) -> &BitStringRef {
+        &self.subject_public_key
     }
 }
