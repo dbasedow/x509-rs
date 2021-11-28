@@ -13,6 +13,8 @@ use crate::common::certificate::Version;
 
 #[derive(Debug)]
 pub struct TBSCertificateRef<'a> {
+    raw_data: &'a [u8],
+
     version: Version,
     serial_number: IntegerRef<'a>,
     algorithm_identifier: AlgorithmidentifierRef<'a>,
@@ -26,8 +28,20 @@ pub struct TBSCertificateRef<'a> {
 }
 
 impl<'a> TBSCertificateRef<'a> {
+    pub fn raw_data(&self) -> &[u8] {
+        &self.raw_data
+    }
+
     pub fn extensions(&self) -> Option<ExtensionsRef> {
         self.extensions
+    }
+
+    pub fn subject(&self) -> &NameRef {
+        &self.subject
+    }
+
+    pub fn issuer(&self) -> &NameRef {
+        &self.issuer
     }
 
     pub fn algorithm_identifier(&self) -> &AlgorithmidentifierRef {
@@ -69,15 +83,26 @@ impl<'a> CertificateRef<'a> {
     pub fn tbs_cert(&self) -> &TBSCertificateRef<'a> {
         &self.tbs_cert
     }
+
+    pub fn signature_algorithm(&self) -> &AlgorithmidentifierRef<'a> {
+        &self.signature_algorithm
+    }
+
+    pub fn signature(&self) -> &BitStringRef<'a> {
+        &self.signature
+    }
 }
 
 pub(crate) fn expect_tbs<'a>(data: &'a [u8]) -> Result<(&[u8], TBSCertificateRef), ParseError> {
-    let (data, tbs_data) = expect_sequence(data)?;
-    let tbs_cert = parse_tbs(tbs_data)?;
-    Ok((data, tbs_cert))
+    let (rest, tbs_data) = expect_sequence(data)?;
+    let size_of_raw_tbs = data.len() - rest.len();
+    let raw_tbs = &data[..size_of_raw_tbs];
+    let tbs_cert = parse_tbs(tbs_data, raw_tbs)?;
+    Ok((rest, tbs_cert))
 }
 
-fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
+/// raw_data is the slice containing all of TBS including the sequence wrapper. this is what will be checked in signature verification
+fn parse_tbs<'a>(data: &'a [u8], raw_data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
     let (data, version) = parse_version(data)?;
     let (data, serial_number) = expect_integer(data)?;
     let (data, algorithm_identifier) = parse_algorithm_identifier(data)?;
@@ -91,6 +116,8 @@ fn parse_tbs<'a>(data: &'a [u8]) -> Result<TBSCertificateRef<'a>, ParseError> {
     expect_empty(data)?;
 
     let tbs = TBSCertificateRef {
+        raw_data,
+
         version,
         serial_number,
         algorithm_identifier,
