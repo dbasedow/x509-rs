@@ -32,6 +32,10 @@ impl<'a> TBSCertificateRef<'a> {
         &self.raw_data
     }
 
+    pub fn serial_number(&self) -> &IntegerRef {
+        &self.serial_number
+    }
+
     pub fn extensions(&self) -> Option<ExtensionsRef> {
         self.extensions
     }

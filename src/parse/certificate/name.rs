@@ -20,6 +20,12 @@ impl<'a> NameRef<'a> {
         let (rest, dn) = DistinguishedNameRef::parse(data)?;
         Ok((rest, Self::DistinguishedNameRef(dn)))
     }
+
+    pub fn bytes(&self) -> &[u8] {
+        match &self {
+            &NameRef::DistinguishedNameRef(dn) => dn.data,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -63,11 +69,10 @@ impl<'a> fmt::Debug for RelativeDistinguishedNameRef<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut set_builder = f.debug_set();
         for attr in self.iter() {
-            if let Ok(attr) = attr {
-                set_builder.entry(&attr);
-            } else {
-                set_builder.entry(&"error in RDN");
-            }
+            let attr = attr.map_err(|_e| {
+                fmt::Error
+            })?;
+            set_builder.entry(&attr);
         }
         set_builder.finish()
     }

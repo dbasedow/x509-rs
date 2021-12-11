@@ -32,6 +32,10 @@ impl<'a> IntegerRef<'a> {
     pub fn to_big_int(&self) -> num_bigint::BigInt {
         num_bigint::BigInt::from_signed_bytes_be(self.0)
     }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl<'a> Debug for IntegerRef<'a> {

@@ -1,7 +1,7 @@
 use std::fmt::{self, Debug, Display, Formatter};
 
 #[derive(PartialEq, Eq, Hash)]
-pub struct PrintableStringRef<'a>(&'a [u8]);
+pub struct PrintableStringRef<'a>(pub(crate) &'a [u8]);
 
 impl<'a> PrintableStringRef<'a> {
     pub fn new(data: &'a [u8]) -> Self {
