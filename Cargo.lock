@@ -385,3 +385,11 @@ dependencies = [
  "ring",
  "untrusted 0.6.2",
 ]
+
+[[package]]
+name = "x509-macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn",
+]
