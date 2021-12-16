@@ -167,7 +167,7 @@ fn parse_subject_unique_id<'a>(
 fn test_cert() {
     use core::str::FromStr;
 
-    let data = include_bytes!("../../certs/test.crt");
+    let data = include_bytes!("../../../certs/test.crt");
     let r = CertificateRef::from_slice(data);
     assert!(r.is_ok());
     let cert = r.unwrap();

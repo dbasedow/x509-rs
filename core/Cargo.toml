@@ -1,0 +1,16 @@
+[package]
+name = "x509-core"
+version = "0.1.0"
+authors = ["Daniel Basedow <daniel.basedow@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+chrono = "0.4"
+derive_builder = "0.10"
+num-bigint = "0.2"
+ring = "0.16"
+untrusted = "0.6"
+
+[dev-dependencies]
+hex = "0.3"
+base64 = "0.10.1"

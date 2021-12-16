@@ -123,7 +123,7 @@ impl<'a> ExtensionRef<'a> {
 
 #[test]
 fn test_extensions() {
-    let data = include_bytes!("../../../certs/test.crt");
+    let data = include_bytes!("../../../../certs/test.crt");
     let r = crate::parse::parsing::CertificateRef::from_slice(data);
     assert!(r.is_ok());
     let cert = r.unwrap();
