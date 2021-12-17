@@ -67,6 +67,14 @@ impl<'a> From<&'a ObjectIdentifier> for ObjectIdentifierRef<'a> {
 pub struct ObjectIdentifierRef<'a>(pub(crate) &'a [u8]);
 
 impl<'a> ObjectIdentifierRef<'a> {
+    pub fn new(data: &'a [u8]) -> Self {
+        Self(data)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0
+    }
+
     pub fn to_parts(&self) -> Vec<u64> {
         let mut res = Vec::new();
         let data = self.0;
