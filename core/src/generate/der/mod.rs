@@ -109,7 +109,7 @@ impl ToDer for DateTime<Utc> {
         if year >= 1950 && year < 2049 {
             let yy = year % 100;
             let s = format!(
-                "{}{}{}{}{}{}Z",
+                "{:02}{:02}{:02}{:02}{:02}{:02}Z",
                 yy,
                 self.month(),
                 self.day(),
@@ -122,7 +122,7 @@ impl ToDer for DateTime<Utc> {
         } else {
             let yy = year % 100;
             let s = format!(
-                "{}{}{}{}{}{}Z",
+                "{:04}{:02}{:02}{:02}{:02}{:02}Z",
                 yy,
                 self.month(),
                 self.day(),
@@ -142,6 +142,48 @@ impl ToDer for DateTime<Utc> {
         } else {
             DataType::GeneralizedTime.into()
         }
+    }
+}
+
+#[derive(Clone)]
+pub enum Data {
+    Boolean(Boolean),
+    Integer(Integer),
+    BitString(BitString),
+    OctetString(OctetString),
+    Null(Null),
+    ObjectIdentifier(ObjectIdentifier),
+    Utf8String(Utf8String),
+    // Sequence(Sequence),
+    // Set(Set),
+    // PrintableString(PrintableString),
+    // T61String(T61String),
+    // IA5String(IA5String),
+    // UTCTime(UTCTime),
+    // GeneralizedTime(GeneralizedTime),
+    // VisibleString(VisibleString),
+    // BMPString(BMPString),
+}
+
+impl ToDer for Data {
+    fn encode_inner(&self) -> Result<Vec<u8>, EncodingError> {
+        unreachable!()
+    }
+
+    fn to_der(&self) -> Result<Vec<u8>, EncodingError> {
+        match self {
+            Data::Boolean(d) => d.to_der(),
+            Data::Integer(d) => d.to_der(),
+            Data::BitString(d) => d.to_der(),
+            Data::OctetString(d) => d.to_der(),
+            Data::Null(d) => d.to_der(),
+            Data::ObjectIdentifier(d) => d.to_der(),
+            Data::Utf8String(d) => d.to_der(),
+        }
+    }
+
+    fn get_tag(&self) -> u8 {
+        unreachable!()
     }
 }
 

@@ -4,6 +4,7 @@ use super::{DataType, ToDer};
 #[derive(Debug, PartialEq)]
 pub struct OctetStringRef<'a>(&'a [u8]);
 
+#[derive(Clone)]
 pub struct OctetString(Vec<u8>);
 
 impl OctetString {

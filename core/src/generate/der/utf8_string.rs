@@ -1,6 +1,7 @@
 use super::super::error::EncodingError;
 use super::{DataType, ToDer};
 
+#[derive(Clone)]
 pub struct Utf8String(Vec<u8>);
 
 impl Utf8String {

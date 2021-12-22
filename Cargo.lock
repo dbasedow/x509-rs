@@ -913,6 +913,8 @@ dependencies = [
 name = "x509-crypto"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "chrono",
  "ecdsa 0.13.3",
  "md-5",
  "p256",

@@ -8,13 +8,13 @@ use crate::common::{certificate::Version, der::ExplicitTag};
 #[derive(Builder)]
 #[builder(pattern = "owned")]
 pub struct TBSCertificate {
-    serial_number: Integer,
-    signature: AlgorithmIdentifier,
-    issuer: Name,
-    validity: Validity,
-    subject: Name,
-    subject_public_key_info: SubjectPublicKeyInfo,
-    extensions: Option<Extensions>,
+    pub serial_number: Integer,
+    pub signature: AlgorithmIdentifier,
+    pub issuer: Name,
+    pub validity: Validity,
+    pub subject: Name,
+    pub subject_public_key_info: SubjectPublicKeyInfo,
+    pub extensions: Option<Extensions>,
 }
 
 impl ToDer for TBSCertificate {
@@ -46,13 +46,15 @@ impl ToDer for TBSCertificate {
 
 #[test]
 fn test_tbs_cert_builder() {
+    use crate::generate::der::Data;
+
     let builder = TBSCertificateBuilder::default();
     //ISSUER
     let mut issuer_dn = super::certificate::DistinguishedName::default();
     let mut rdn_cn = super::certificate::RelativeDistinguishedName::default();
     rdn_cn.insert(super::certificate::AttributeTypeAndValue::new(
         super::der::ObjectIdentifier::from_str("3.4.5").unwrap(),
-        Box::new(super::der::Utf8String::from_str("foo")),
+        Data::Utf8String(super::der::Utf8String::from_str("foo")),
     ));
     issuer_dn.push(rdn_cn);
 
@@ -70,14 +72,14 @@ fn test_tbs_cert_builder() {
     let mut rdn_cn = super::certificate::RelativeDistinguishedName::default();
     rdn_cn.insert(super::certificate::AttributeTypeAndValue::new(
         super::der::ObjectIdentifier::from_str("3.4.5").unwrap(),
-        Box::new(super::der::Utf8String::from_str("bar")),
+        Data::Utf8String(super::der::Utf8String::from_str("bar")),
     ));
     subject_dn.push(rdn_cn);
 
     //SUBJECT PUBLIC KEY INFO
     let algo_id_rsa = super::der::ObjectIdentifier::from_str("1.2.840.113549.1.1.1").unwrap();
     let algorithm_identifier_subject_key =
-        AlgorithmIdentifier::new(algo_id_rsa, Box::new(super::der::Null()));
+        AlgorithmIdentifier::new(algo_id_rsa, Data::Null(super::der::Null()));
     let public_key = super::der::BitString::new(vec![20; 256], 2048);
     let sub_pub_key_info = SubjectPublicKeyInfo::new(algorithm_identifier_subject_key, public_key);
 
@@ -94,7 +96,7 @@ fn test_tbs_cert_builder() {
         .serial_number(Integer::from_i64(10))
         .signature(AlgorithmIdentifier::new(
             super::der::ObjectIdentifier::from_str("1.2.3").unwrap(),
-            Box::new(super::der::Null()),
+            Data::Null(super::der::Null()),
         ))
         .issuer(Name::DistinguishedName(issuer_dn))
         .validity(validity)

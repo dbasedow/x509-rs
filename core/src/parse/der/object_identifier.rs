@@ -4,7 +4,7 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::str::FromStr;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ObjectIdentifier(Vec<u8>);
+pub struct ObjectIdentifier(pub(crate) Vec<u8>);
 
 impl ObjectIdentifier {
     pub fn from_str(s: &str) -> Result<Self, ()> {
@@ -57,9 +57,9 @@ fn encode_oid_part(n: u64) -> Vec<u8> {
     res
 }
 
-impl<'a> From<&'a ObjectIdentifier> for ObjectIdentifierRef<'a> {
-    fn from(oid: &'a ObjectIdentifier) -> Self {
-        Self(&oid.0)
+impl<'a> Into<ObjectIdentifier> for ObjectIdentifierRef<'a> {
+    fn into(self) -> ObjectIdentifier {
+        ObjectIdentifier(self.0.to_vec())
     }
 }
 

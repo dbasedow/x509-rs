@@ -1,6 +1,7 @@
 use super::super::error::EncodingError;
 use super::{DataType, ToDer};
 
+#[derive(Clone)]
 pub struct BitString {
     data: Vec<u8>,
     padding_bits: u8,

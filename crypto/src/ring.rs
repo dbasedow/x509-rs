@@ -1,8 +1,8 @@
 use crate::{
-    ECDSA_P256_OID, ECDSA_P384_OID, ECDSA_SHA256_OID, ECDSA_SHA384_OID, RSA_SHA1_OID,
+    Algorithm, ECDSA_P256_OID, ECDSA_P384_OID, ECDSA_SHA256_OID, ECDSA_SHA384_OID, RSA_SHA1_OID,
     RSA_SHA256_OID, RSA_SHA384_OID, RSA_SHA512_OID,
 };
-use ring::signature;
+use ring::{rand, signature};
 use x509_core::parse::{
     der::{AnyRef, ObjectIdentifierRef},
     parsing::CertificateRef,
@@ -13,7 +13,10 @@ pub enum Error {
     UnsupportedAlgorithm(String),
     UnsupportedPublicKey(String),
     VerifyFailed,
+    InvalidPrivateKey,
+    OOM,
 }
+
 
 fn oid_bytes_to_string(oid: &[u8]) -> String {
     ObjectIdentifierRef::new(oid).to_string()
@@ -112,5 +115,19 @@ pub fn check_signature(subject: &CertificateRef, issuer: &CertificateRef) -> Res
             }
         }
         oid => Err(Error::UnsupportedAlgorithm(oid_bytes_to_string(oid))),
+    }
+}
+
+pub fn sign(tbs: &[u8], key_pair: signature::RsaKeyPair, algorithm: Algorithm) -> Result<Vec<u8>, Error> {
+    match algorithm {
+        Algorithm::RSA_SHA256 => {
+            let rng = rand::SystemRandom::new();
+            let mut signature = vec![0; key_pair.public_modulus_len()];
+            key_pair
+                .sign(&signature::RSA_PKCS1_SHA256, &rng, tbs, &mut signature)
+                .map_err(|_| Error::OOM)?;
+            Ok(signature)
+        }
+        algo => unimplemented!(),
     }
 }

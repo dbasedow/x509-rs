@@ -1,7 +1,7 @@
 use super::super::error::EncodingError;
 use super::{DataType, ToDer};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct Integer(Vec<u8>);
 
 impl Integer {

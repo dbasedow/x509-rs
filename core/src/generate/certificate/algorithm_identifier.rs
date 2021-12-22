@@ -1,20 +1,24 @@
+use crate::generate::der::Data;
+
 use super::super::{
     der::{DataType, ObjectIdentifier, ToDer},
     error::EncodingError,
 };
 
+#[derive(Clone)]
 pub struct AlgorithmIdentifier {
     algorithm_identifier: ObjectIdentifier,
-    parameters: Box<dyn ToDer>, // any type
+    parameters: Data, // any type
 }
 
 impl AlgorithmIdentifier {
-    pub fn new(algorithm_identifier: ObjectIdentifier, parameters: Box<dyn ToDer>) -> Self {
+    pub fn new(algorithm_identifier: ObjectIdentifier, parameters: Data) -> Self {
         Self {
             algorithm_identifier,
             parameters,
         }
     }
+    // todo allow mutating parameters after construction
 }
 
 impl ToDer for AlgorithmIdentifier {

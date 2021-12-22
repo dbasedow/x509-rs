@@ -1,15 +1,18 @@
+use crate::generate::der::Data;
+
 use super::super::{
     der::{DataType, ObjectIdentifier, ToDer},
     error::EncodingError,
 };
 
+#[derive(Clone)]
 pub struct AttributeTypeAndValue {
     typ: ObjectIdentifier,
-    value: Box<dyn ToDer>,
+    value: Data,
 }
 
 impl AttributeTypeAndValue {
-    pub fn new(typ: ObjectIdentifier, value: Box<dyn ToDer>) -> Self {
+    pub fn new(typ: ObjectIdentifier, value: Data) -> Self {
         Self { typ, value }
     }
 }
@@ -27,7 +30,7 @@ impl ToDer for AttributeTypeAndValue {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RelativeDistinguishedName {
     values: Vec<AttributeTypeAndValue>,
 }
@@ -56,7 +59,7 @@ impl ToDer for RelativeDistinguishedName {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DistinguishedName(Vec<RelativeDistinguishedName>);
 
 impl DistinguishedName {
@@ -80,6 +83,7 @@ impl ToDer for DistinguishedName {
     }
 }
 
+#[derive(Clone)]
 pub enum Name {
     DistinguishedName(DistinguishedName),
 }

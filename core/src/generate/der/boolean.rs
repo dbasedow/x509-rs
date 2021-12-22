@@ -2,7 +2,7 @@ use super::super::error::EncodingError;
 use super::{DataType, ToDer};
 use std::fmt::{self, Debug, Formatter};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct Boolean(u8);
 
 impl Boolean {
